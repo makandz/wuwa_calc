@@ -13,6 +13,7 @@ import type { Member, Combo, Pick, Filters, Solved, SolveSave, Axis, TeamCost, S
 import { runTeam, runFromScore } from "../teamrun.js";
 import type { TeamRun } from "../teamrun.js";
 import { teamKey, teamAt, ALL_TEAMS, PRIMARY_TEAM, INTERCHANGEABLE } from "../teams.js";
+import { DEFAULT_TEAM_COST } from "../costs.js";
 
 /* ------------------------------------------------------------------------------------ teams */
 
@@ -136,7 +137,9 @@ export const results = new Map<string, TeamRun>();
 
 export function storeSolved(teamKey: string, solved: Solved, f: Filters = filters): void {
   bestPicks.set(bestKey(teamKey, TEAMS[teamKey]!, f), solved);
-  picksCache.set(picksKey(teamKey, TEAMS[teamKey]!, f), solved.picks);
+  const pk = picksKey(teamKey, TEAMS[teamKey]!, f);
+  if (solved.unavailable) picksCache.delete(pk);
+  else picksCache.set(pk, solved.picks);
   solvesDirty = true;
 }
 
@@ -470,6 +473,10 @@ export function solveFits(key: string, solved: Solved, f?: Filters): boolean {
   const members = team.loadouts.map((l, i) => member(l, team.mdps[i]!));
   f ??= filtersOfKey(key, members);
   if (!picksFit(key, solved.picks) || !solved.rows.every((r) => picksFit(key, r)) || !(solved.hidden ?? []).every((r) => picksFit(key, r))) return false;
+  if (solved.unavailable !== undefined) {
+    return f.cost === "makan" && typeof solved.unavailable === "string" && solved.unavailable.length > 0
+      && solved.rows.length === 0 && solved.scores.length === 0 && !(solved.hidden?.length || solved.hiddenScores?.length);
+  }
   const names = new Set([...members.map((m) => m.name), TUNE_BREAK_ENEMY.name]);
   const dps = members.filter((m) => m.mainDps).map((m) => m.name);
   if (!solved.scores.every((s) => s.bySlot.every(([n]) => names.has(n)) && dps.every((d) => s.bySlot.some(([n]) => n === d)))) return false;
@@ -555,6 +562,7 @@ export const hashParams = (): URLSearchParams => new URLSearchParams(location.ha
 const COMPARE_PARAM: Record<Axis, string> = { weapons: "cw", echoes: "ce", mainstats: "cm", substats: "cb", sequences: "cq", refines: "cr" };
 const SCOPED_PARAM = "cs";
 const COST_CODE: Record<TeamCost, string> = {
+  makan: "makan",
   s0r0: "r0", s0r1mdps: "r1m", s0r1: "r1",
   s2r1mdps: "s2m", s3r1mdps: "s3m", s6r1mdps: "s6m", s6r5: "s6r5",
 };
@@ -583,7 +591,7 @@ export function applyHash(): boolean {
     if (next.length !== cur.length || next.some((n) => !cur.includes(n))) { filters.matrix = next; changed = true; }
   }
   const code = params.get("tc");
-  const cost = (Object.keys(COST_CODE) as TeamCost[]).find((c) => COST_CODE[c] === code) ?? "s0r1";
+  const cost = (Object.keys(COST_CODE) as TeamCost[]).find((c) => COST_CODE[c] === code) ?? DEFAULT_TEAM_COST;
   if (filters.cost !== cost) { filters.cost = cost; changed = true; }
   for (const axis of AXES) {
     const next = (params.get(COMPARE_PARAM[axis]) ?? "").split(",").filter(Boolean)
@@ -677,7 +685,7 @@ export function syncHash(team: string | null = hashTeam(), push = false): void {
     .filter(([, m]) => m === mode).map(([name]) => encodeURIComponent(map === resonatorFilters ? name.replace(/ /g, "") : name)).join(",");
   const compact = (n: string): string => encodeURIComponent(n.replace(/ /g, ""));
   const parts = filters.matrix.length ? [`mx=${filters.matrix.map(compact).join(",")}`] : [];
-  if (filters.cost !== "s0r1") parts.push(`tc=${COST_CODE[filters.cost]}`);
+  parts.push(`tc=${COST_CODE[filters.cost]}`);
   for (const axis of AXES) {
     if (filters[axis].length) parts.push(`${COMPARE_PARAM[axis]}=${filters[axis].map((n) => encodeURIComponent(n.replace(/ /g, ""))).join(",")}`);
   }

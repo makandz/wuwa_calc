@@ -10,6 +10,7 @@ import { runTeam, scoreOf, erRollsFor, shortOf, deriveRun } from "./teamrun.js";
 import type { TeamRun, RowScore } from "./teamrun.js";
 import { teamAt } from "./teams.js";
 import { critLineOf, Mainstat } from "./shared/mainstats.js";
+import { DEFAULT_TEAM_COST, makanCost } from "./costs.js";
 
 export interface Member {
   name: string;
@@ -44,7 +45,7 @@ export const AXES: Axis[] = ["weapons", "echoes", "mainstats", "sequences", "ref
  *  name is the chain level and weapon rank on top of that — one main DPS's alone where the name
  *  ends in `mdps` (never a support's, however much the team would gain), everyone's where it
  *  doesn't. Rovers and 4* are S6 on standard/4* weapons throughout. */
-export const TEAM_COSTS = ["s0r0", "s0r1mdps", "s0r1",
+export const TEAM_COSTS = ["makan", "s0r0", "s0r1mdps", "s0r1",
   "s2r1mdps", "s3r1mdps", "s6r1mdps", "s6r5"] as const;
 export type TeamCost = typeof TEAM_COSTS[number];
 
@@ -99,7 +100,7 @@ export const echoLabel = (l: Loadout, echo: EchoLoadout): string => echoLines(l,
 
 /** The page's opening state and what precompute.ts solves under — one definition so shipped keys match. */
 export const defaultFilters = (): Filters => ({
-  matrix: [], cost: "s0r1", weapons: [], echoes: [], mainstats: [], substats: [], sequences: [], refines: [], scoped: [],
+  matrix: [], cost: DEFAULT_TEAM_COST, weapons: [], echoes: [], mainstats: [], substats: [], sequences: [], refines: [], scoped: [],
 });
 
 export const axisOpen = (m: Member, filters: Filters, axis: Axis): boolean =>
@@ -134,6 +135,12 @@ export const picksKey = (teamKey: string, members: Member[], filters: Filters): 
  *  matrix and substat spread. Only weapon/echo/mainstat are ever searched. */
 export interface Pick { weapon: number; echo: number; mainstat: number; sequence: number; refine: number; matrix: boolean; highSubs: boolean; }
 
+class UnavailableBuild extends Error {
+  constructor(message: string, readonly picks: Pick[]) {
+    super(message);
+  }
+}
+
 export const comboOf = (l: Loadout, p: Pick): Combo => {
   const matrix = p.matrix && l.resonator.matrix ? l.resonator.matrix : null;
   return {
@@ -163,6 +170,10 @@ export const grantToOne = (cost: TeamCost): boolean => cost.endsWith("mdps");
 function costLevel(m: Member, cost: TeamCost, holds: boolean): number | null {
   const l = m.loadout;
   const max = l.sequences.length;
+  if (cost === "makan") {
+    const at = makanCost(m.name).sequence;
+    return at < l.minSequence || at > max ? null : at;
+  }
   if (!max) return l.minSequence ? null : 0;
   const at = Math.min(Math.max(Math.min(baseSequence(l.resonator), max), costGrant(cost, holds).sequence), max);
   return at < l.minSequence ? null : at;
@@ -171,7 +182,7 @@ function costLevel(m: Member, cost: TeamCost, holds: boolean): number | null {
 /** The rank index a lifted member runs `weapon` at: the cost's, capped by the ranks that weapon
  *  actually lists (a loadout may pin one rank rather than the whole five). */
 const costRefine = (m: Member, weapon: number, cost: TeamCost, holds: boolean): number =>
-  Math.min(costGrant(cost, holds).refine, m.loadout.refinements[weapon]!.length - 1);
+  Math.min(cost === "makan" ? makanCost(m.name).refinement - 1 : costGrant(cost, holds).refine, m.loadout.refinements[weapon]!.length - 1);
 
 /** Ranks a row at `p` runs its weapon at: every listed rank while refines are compared there, else
  *  the build's own. An open Sequences box runs its whole ladder at R1 whatever the cost hands out,
@@ -196,7 +207,7 @@ export function sequenceLevels(m: Member, filters: Filters, holds = true): numbe
     return at === null ? [] : [at];
   }
   const base = Math.min(baseSequence(l.resonator), max);
-  const from = Math.max(l.minSequence, l.resonator.tier === Tier.Free ? 0 : base);
+  const from = Math.max(l.minSequence, filters.cost === "makan" || l.resonator.tier === Tier.Free ? 0 : base);
   return Array.from({ length: max - from + 1 }, (_, i) => from + i);
 }
 
@@ -213,12 +224,20 @@ export const standardWeapon = (l: Loadout): number => Math.max(0, l.weapons.find
 export function weaponOptions(m: Member, filters: Filters, sig: boolean): number[] {
   const l = m.loadout;
   if (axisOpen(m, filters, "weapons")) return l.weapons.map((_, i) => i);
+  if (filters.cost === "makan") {
+    const own = makanCost(m.name);
+    if (own.weapon) {
+      const at = l.weapons.findIndex((w) => weaponBase(w) === own.weapon);
+      return at < 0 ? [] : [at];
+    }
+    return [own.signature ? 0 : standardWeapon(l)];
+  }
   return [sig ? 0 : standardWeapon(l)];
 }
 
 /** Whether every limited resonator wears their signature: `s0r0` gives nobody one and `s0r1mdps`
  *  hands out exactly one, so only those two search on standards. */
-export const sigForAll = (cost: TeamCost): boolean => cost !== "s0r0" && cost !== "s0r1mdps";
+export const sigForAll = (cost: TeamCost): boolean => cost !== "makan" && cost !== "s0r0" && cost !== "s0r1mdps";
 
 export const sigAllowed = (i: number, holder: number | null, cost: TeamCost): boolean =>
   sigForAll(cost) || (cost === "s0r1mdps" && i === holder);
@@ -446,7 +465,9 @@ export function optimizeTeam(teamKey: string, members: Member[], filters: Filter
     // each member's weapon x echo set, at the level and rank the cost gives them under this holder
     const options = members.map((m, i) => {
       const holds = !one || holder === i;
-      const base = sequenceLevels(m, filters, !one)[0]!;
+      const base = filters.cost === "makan"
+        ? costLevel(m, filters.cost, !one) ?? sequenceLevels(m, filters, !one)[0]!
+        : sequenceLevels(m, filters, !one)[0]!;
       const level = one && holds ? costLevel(m, filters.cost, true) : null;
       const sequence = level === null ? base : Math.max(level, base);
       const list: Pick[] = [];
@@ -485,12 +506,12 @@ export function optimizeTeam(teamKey: string, members: Member[], filters: Filter
     // rotations and levels rather than of the one who came up short
     const built = members.map((m, j) => `${m.name} s${picks[j]!.sequence}r${picks[j]!.refine + 1} ${m.loadout.refinements[picks[j]!.weapon]![picks[j]!.refine]!.name.replace(/ R\d$/, "")}`).join(", ");
     if (shortOf(teamKey, members, combo)[i] === "cr") {
-      throw new Error(`${members[i]!.name} on ${teamKey} (${built}) cannot reach their ${l.minCritRate}% Crit Rate: `
-        + `no weapon, echo and main stat on their list shows that much on the character screen`);
+      throw new UnavailableBuild(`${members[i]!.name} on ${teamKey} (${built}) cannot reach their ${l.minCritRate}% Crit Rate: `
+        + `no weapon, echo and main stat on their list shows that much on the character screen`, picks);
     }
     const asked = l.minEr ? ` (their kit asks for ${l.minEr}% at least)` : "";
-    throw new Error(`${members[i]!.name} on ${teamKey} (${built}) cannot fill their Energy bar${asked}: ${rolls} ER rolls wanted, `
-      + `${l.substat.tiers[l.substat.tiers.length - 1]!.rolls} is all a spread carries, and no ER 3-cost main stat is on their list`);
+    throw new UnavailableBuild(`${members[i]!.name} on ${teamKey} (${built}) cannot fill their Energy bar${asked}: ${rolls} ER rolls wanted, `
+      + `${l.substat.tiers[l.substat.tiers.length - 1]!.rolls} is all a spread carries, and no ER 3-cost main stat is on their list`, picks);
   }
   return picks;
 }
@@ -672,7 +693,14 @@ export function solveTeam(
     bases = new Map();
     cachedTeam = teamKey;
   }
-  const picks = known ?? optimizeTeam(teamKey, members, filters);
+  let picks: Pick[];
+  try {
+    picks = known ?? optimizeTeam(teamKey, members, filters);
+  } catch (err) {
+    if (filters.cost !== "makan" || !(err instanceof UnavailableBuild)) throw err;
+    onProgress?.(1);
+    return { picks: err.picks, rows: [], scores: [], unavailable: err.message };
+  }
   const { rows, hidden } = rowPicks(teamKey, members, picks, filters, (s) => onProgress?.(s / 2));
   const score = (row: Pick[]): RowScore => {
     const combo = members.map((m, i) => comboOf(m.loadout, row[i]!));
@@ -691,7 +719,7 @@ export function solveTeam(
 export interface SolveRequest { id: number; teamKey: string; filters: Filters; picks: Pick[] | null }
 
 /** `hidden`/`hiddenScores` are absent on a solve saved before they existed. */
-export interface Solved { picks: Pick[]; rows: Pick[][]; scores: RowScore[]; hidden?: Pick[][]; hiddenScores?: RowScore[] }
+export interface Solved { picks: Pick[]; rows: Pick[][]; scores: RowScore[]; hidden?: Pick[][]; hiddenScores?: RowScore[]; unavailable?: string }
 
 export interface SolveResponse extends Solved { id: number }
 /** A half-finished solve saying how far in it is — `share` is 0 to 1 of that one team's work. */

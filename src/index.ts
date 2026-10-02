@@ -171,7 +171,7 @@ function listen(w: Worker): void {
       job.onShare(data.share);
       return;
     }
-    const solved: Solved = { picks: data.picks, rows: data.rows, scores: data.scores, hidden: data.hidden ?? [], hiddenScores: data.hiddenScores ?? [] };
+    const solved: Solved = { picks: data.picks, rows: data.rows, scores: data.scores, hidden: data.hidden ?? [], hiddenScores: data.hiddenScores ?? [], unavailable: data.unavailable };
     if (solveFits(bestKey(job.key, job.members, job.f), solved)) {
       settle(w, job, solved);
       return;

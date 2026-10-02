@@ -9,11 +9,21 @@ python dev.py                  # compilers + server; then http://127.0.0.1:8731/
 npm run build                  # tsc into dist/src/, then esbuild into dist/bundle/
 npm run precompute             # solve every team, write dist/solves/ for the published site
 npx tsc --noEmit               # just typecheck
+npm test                      # cost preset regression checks, after npm run build
 ```
 
 Has to be served, not opened off disk — browsers block module imports on `file://` URLs. Use
 `127.0.0.1`, not `localhost`: the server binds IPv4 only, and on Windows `localhost` tries IPv6
 first and stalls ~200ms on *every* connection.
+
+The default Team Cost is **Makan's costs**. Unlisted characters use S0 and their configured
+standard or 4-star weapon, including standard characters, 4-stars and Rovers. R0 means no
+signature weapon; weapons configured at a fixed refinement retain that rank. The
+per-character exceptions live in `src/costs.ts`; Denia uses Stringmaster R1 in both modes.
+Opening a comparison still shows alternative sequences or weapons. Shared links explicitly
+include the selected cost preset, and the original presets remain available.
+Rotations that require higher sequences or cannot meet energy or Crit Rate requirements are
+omitted from this preset. This includes Jianxin's S2 rotation and Roccia's S6-only variant.
 
 | path | role |
 | --- | --- |
@@ -27,6 +37,7 @@ first and stalls ~200ms on *every* connection.
 | `src/engine/rotation.ts` | `Rotation` and the scheduler that decides whose turn it is |
 | `src/teams.ts` | the `LOADOUTS` registry and every team the comparison table runs (`ALL_TEAMS`) |
 | `src/solver.ts` | the filter/pick vocabulary and the build search; also the Worker entry point |
+| `src/costs.ts` | the default preset and Makan's per-character sequence, weapon and refinement overrides |
 | `src/teamrun.ts` | the DOM-free engine run the search scores (`runTeam`) and the lines/totals read off it |
 | `src/display.ts` | turns a run into the report/hover-trace data the page renders |
 | `src/precompute.ts` | solves the whole roster offline into `dist/solves/`, one file per filter state, so the published site opens with no search; each key is solved once and `index.json` names the files a state needs |
