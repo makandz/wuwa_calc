@@ -246,13 +246,9 @@ function showMenu(x: number, y: number, items: MenuItem[]): void {
 /** A member's name cell: the resonator, then `S?R?` — the name cell's menu offers the level and
  *  rank as filter lines of its own (`openNameMenu`). */
 function memberLabel(m: Member, combo: Combo): string {
-  return [m.mainDps ? loadoutName(m.loadout) : m.name, combo.matrix ? "(Matrix)" : "", `${seqToken(m, combo)}${rankToken(m, combo)}`]
+  return [m.mainDps ? loadoutName(m.loadout) : m.name, combo.matrix ? "(Matrix)" : "", `S${combo.sequence}${rankToken(m, combo)}`]
     .filter(Boolean).join(" ");
 }
-/** Any level above S0 is named — the one a chain comes with, and the one a cost mode hands out —
- *  and every level is once the chain is compared, so an S0 row reads S0 beside its S1. */
-const seqToken = (m: Member, combo: Combo): string =>
-  combo.sequence > 0 || axisOpen(m, filters, "sequences") ? `S${combo.sequence}` : "";
 /** "" while a Weapon column carries the rank. A signature, any weapon while refines are compared,
  *  and any rank above R1 read their rank — a rank above R1 is one the loadout pinned itself
  *  (`BLOODPACTS_PLEDGE[4]`), which is the only way a build runs one. Everything else is at R1 off

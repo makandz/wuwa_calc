@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ALL_TEAMS, teamKey } from "../dist/src/teams.js";
+import { ROVER_HAVOC } from "../dist/src/resonators/havoc/rover_havoc.js";
 import { DEFAULT_TEAM_COST, MAKAN_COST_OVERRIDES, makanCost } from "../dist/src/costs.js";
 import {
   TEAM_COSTS, defaultFilters, member, hasBuild, eligibleWeapons, sequenceLevels,
@@ -8,7 +9,7 @@ import {
 } from "../dist/src/solver.js";
 import { applyHash, syncHash, filters, solveFits, storeSolved, picksCache, bestPicks } from "../dist/src/page/model.js";
 
-const loadouts = [...new Set(ALL_TEAMS.flatMap((t) => t.loadouts))];
+const loadouts = [...new Set([...ALL_TEAMS.flatMap((t) => t.loadouts), ROVER_HAVOC])];
 const membersNamed = (name) => loadouts.filter((l) => l.resonator.name === name).map((l) => member(l));
 
 test("the custom default resolves every named override in all its loadout variants", () => {
@@ -35,8 +36,8 @@ test("the custom default resolves every named override in all its loadout varian
   }
 });
 
-test("unlisted Rovers, standard and limited characters use S0 without a limited weapon", () => {
-  for (const name of ["Aero Rover", "Changli", "Encore"]) {
+test("unlisted standard and limited characters use S0 without a limited weapon", () => {
+  for (const name of ["Changli", "Encore"]) {
     const m = membersNamed(name)[0];
     assert.ok(m);
     assert.deepEqual(sequenceLevels(m, defaultFilters()), [0]);
@@ -48,9 +49,11 @@ test("unlisted Rovers, standard and limited characters use S0 without a limited 
   assert.deepEqual(sequenceLevels(membersNamed("Jianxin")[0], builtIn), [2]);
 });
 
-test("Makan's costs runs Verina at S2 and every configured four-star at S6", () => {
-  for (const [name, level] of [["Verina", 2], ["Sanhua", 6], ["Buling", 6], ["Danjin", 6], ["Mortefi", 6]]) {
-    for (const m of membersNamed(name)) {
+test("Makan's costs runs Verina at S2 and four-stars and all Rover elements at S6", () => {
+  for (const [name, level] of [["Verina", 2], ["Sanhua", 6], ["Buling", 6], ["Danjin", 6], ["Mortefi", 6], ["Aero Rover", 6], ["Electro Rover", 6], ["Havoc Rover", 6], ["Spectro Rover", 6]]) {
+    const variants = membersNamed(name);
+    assert.ok(variants.length > 0, `${name} matches an existing loadout`);
+    for (const m of variants) {
       assert.ok(hasBuild(m, defaultFilters()), `${name} has a valid build`);
       assert.deepEqual(sequenceLevels(m, defaultFilters()), [level]);
       assert.equal(isSignature(m.loadout, eligibleWeapons(m, defaultFilters())[0]), false);
