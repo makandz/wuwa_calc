@@ -1,8 +1,8 @@
 # wuwa_calc
 
-A Wuthering Waves damage calculator. Pure TypeScript, no framework, no bundler — `tsc` compiles
+A Wuthering Waves damage calculator. Pure TypeScript with no framework. `tsc` compiles
 everything under `src/` into `dist/`, mirrored one level deeper (`src/engine/gear.ts` →
-`dist/src/engine/gear.js`).
+`dist/src/engine/gear.js`), and esbuild bundles the browser entry points.
 
 ```
 python dev.py                  # compilers + server; then http://127.0.0.1:8731/index.html
@@ -11,6 +11,11 @@ npm run precompute             # solve every team, write dist/solves/ for the pu
 npx tsc --noEmit               # just typecheck
 npm test                      # cost preset regression checks, after npm run build
 ```
+
+Vercel runs `npm run build` before deployment, so `dist/bundle/` is generated and ignored
+by Git. `dist/solves/` stays versioned because the build does not regenerate the precomputed
+calculations. Refresh those with `npm run build && npm run precompute` when calculation
+inputs change.
 
 Has to be served, not opened off disk — browsers block module imports on `file://` URLs. Use
 `127.0.0.1`, not `localhost`: the server binds IPv4 only, and on Windows `localhost` tries IPv6
