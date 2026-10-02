@@ -536,12 +536,12 @@ function rowValues(snap, { mv, avg }, members = []) {
   FORTE_GAUGES.forEach((key, i) => {
     raw[`short:gauge:${RESOURCE_NAME[key]}`] = snap.castUnmet?.[2 + i] ? 1 : 0;
   });
-  const sources = {};
+  const sources2 = {};
   for (const [key, feeds] of Object.entries(FEEDS))
-    sources[key] = tracing(snap, feeds(snap.action));
+    sources2[key] = tracing(snap, feeds(snap.action));
   if (constant)
     raw["empty:scaler"] = constant.label;
-  sources.effRes = (sources.effRes ?? []).map((r) => ({ ...r, value: -r.value }));
+  sources2.effRes = (sources2.effRes ?? []).map((r) => ({ ...r, value: -r.value }));
   if (!fixed(snap.action)) {
     const dot = snap.action.scaling === 3;
     const pct = (v) => `${fmt(v, 2)}%`;
@@ -561,8 +561,8 @@ function rowValues(snap, { mv, avg }, members = []) {
     const floored = inner ? `floor(${base} \xD7 (1${inner}))` : base;
     const own = fmt(OWN_DEF, 0, false, false);
     const formula = `${own} / (${own} + ${floored}${ignoreNew ? ` \xD7 (1 \u2212 ${pct(ignoreNew)})` : ""})`;
-    sources.effDef = [
-      ...sources.effDef ?? [],
+    sources2.effDef = [
+      ...sources2.effDef ?? [],
       // the formula reads across the whole row, so it rides in the label with the value cell left empty
       { source: "", label: `Formula: ${formula}`, value: 0, text: "", summary: true, place: "afterTotal" },
       { source: "", label: "Defense Factor", value: defFactorOf(snap), digits: 4, summary: true, place: "afterTotal", joined: true },
@@ -595,7 +595,7 @@ function rowValues(snap, { mv, avg }, members = []) {
     const rows = [...own, ...traced];
     const folded = [...own, ...foldDuplicates(traced)];
     if (folded.length)
-      sources[key] = folded;
+      sources2[key] = folded;
     if (traced.length)
       buffed.add(key);
     raw[`moved:${key}`] = rows.reduce((n, r) => n + r.value, 0);
@@ -606,7 +606,7 @@ function rowValues(snap, { mv, avg }, members = []) {
     /* Stat.EnergyRegenMult */
   ));
   if (rate.length) {
-    sources.energy = [...sources.energy ?? [], ...rate.map((r) => ({ ...r, section: ENERGY_RATE }))];
+    sources2.energy = [...sources2.energy ?? [], ...rate.map((r) => ({ ...r, section: ENERGY_RATE }))];
     raw["moved:energy"] = (Number(raw["moved:energy"]) || 0) * (1 + snap.stat(
       14
       /* Stat.EnergyRegenMult */
@@ -624,7 +624,7 @@ function rowValues(snap, { mv, avg }, members = []) {
       /* Stat.OfftuneBuildup */
     ));
     if (rate2.length)
-      sources.offtune = [...sources.offtune ?? [], ...rate2.map((r) => ({ ...r, section: OFFTUNE_RATE }))];
+      sources2.offtune = [...sources2.offtune ?? [], ...rate2.map((r) => ({ ...r, section: OFFTUNE_RATE }))];
   }
   const direct = tracing(snap, keysFor(
     snap.action,
@@ -636,7 +636,7 @@ function rowValues(snap, { mv, avg }, members = []) {
     /* Stat.OfftuneBuildup */
   ) / 100)) + direct.reduce((n, r) => n + r.value, 0)) / RESOURCE_SCALE.offtune;
   if (direct.length) {
-    sources.offtune = [...sources.offtune ?? [], ...direct.map((r) => ({
+    sources2.offtune = [...sources2.offtune ?? [], ...direct.map((r) => ({
       ...r,
       value: r.value / RESOURCE_SCALE.offtune,
       section: "Direct Offtune"
@@ -663,26 +663,26 @@ function rowValues(snap, { mv, avg }, members = []) {
     rows.push(...ownShares(snap, declared, snap.action.castForte[i] * unit2));
     rows.push(...traced);
     if (rows.length)
-      sources[`gauge:${RESOURCE_NAME[key]}`] = rows;
+      sources2[`gauge:${RESOURCE_NAME[key]}`] = rows;
     raw[`moved:gauge:${RESOURCE_NAME[key]}`] = rows.reduce((n, r) => n + r.value, 0);
     if (snap.action.resetForte[i])
       raw[`clear:gauge:${RESOURCE_NAME[key]}`] = 1;
   });
   if (!raw.mv)
-    delete sources.mv;
+    delete sources2.mv;
   else {
     const isFactor = (r) => r.stat !== void 0 && splitStat(r.stat)[0] === 16;
-    const parts = sources.mv ?? [];
+    const parts = sources2.mv ?? [];
     if (parts.length)
       buffed.add("mv");
-    sources.mv = [
+    sources2.mv = [
       ...snap.action.mv ? [{ source: snap.action.name, label: "Base MV", value: snap.action.mv / MV_UNIT, percent: true, owner: snap.member }] : [],
       ...parts.filter((r) => !isFactor(r)),
       ...parts.filter(isFactor).map((r) => ({ ...r, section: MV_MULTIPLIER }))
     ];
   }
-  if (sources.dealt?.length) {
-    const half = (stat) => sources.dealt.filter((r) => r.stat !== void 0 && splitStat(r.stat)[0] === stat).reduce((n, r) => n + r.value, 0);
+  if (sources2.dealt?.length) {
+    const half = (stat) => sources2.dealt.filter((r) => r.stat !== void 0 && splitStat(r.stat)[0] === stat).reduce((n, r) => n + r.value, 0);
     const total = half(
       19
       /* Stat.TotalDmg */
@@ -691,7 +691,7 @@ function rowValues(snap, { mv, avg }, members = []) {
       /* Stat.DamageTaken */
     );
     if (total && taken) {
-      sources.dealt = [...sources.dealt, ...[[19, total], [20, taken]].map(([stat, value]) => ({
+      sources2.dealt = [...sources2.dealt, ...[[19, total], [20, taken]].map(([stat, value]) => ({
         source: "",
         label: "Total",
         value,
@@ -701,7 +701,7 @@ function rowValues(snap, { mv, avg }, members = []) {
       }))];
     }
   }
-  const tracedScaler = sources.scaler;
+  const tracedScaler = sources2.scaler;
   if (scaler && tracedScaler) {
     const [baseStat, bonusStat, flatStat] = scaler.stats;
     const sum = (stat) => tracedScaler.filter((r) => r.stat !== void 0 && splitStat(r.stat)[0] === stat).reduce((n, r) => n + r.value, 0);
@@ -709,7 +709,7 @@ function rowValues(snap, { mv, avg }, members = []) {
     if (base) {
       const subtotal = (stat, percent) => tracedScaler.some((r) => r.stat !== void 0 && splitStat(r.stat)[0] === stat) ? [{ source: "", label: "Total", value: sum(stat), section: SECTION_OF[stat], percent, summary: true }] : [];
       const final = `Final ${scaler.word}`;
-      sources.scaler = [
+      sources2.scaler = [
         ...tracedScaler,
         ...subtotal(baseStat, false),
         ...subtotal(bonusStat, true),
@@ -725,14 +725,14 @@ function rowValues(snap, { mv, avg }, members = []) {
       raw[key] = per.some((p) => Number(p.raw[key])) ? 1 : 0;
     }
     for (const key of COMBINED_COLUMNS) {
-      if (sources[key] === void 0 && key === "mv")
+      if (sources2[key] === void 0 && key === "mv")
         continue;
       const last = per.length - 1;
       const rows = foldDuplicates(per.flatMap((p, k) => (p.sources[key] ?? []).filter((r) => r.section !== OFFTUNE_RATE && r.section !== ENERGY_RATE || k === last)));
       if (rows.length)
-        sources[key] = rows;
+        sources2[key] = rows;
       else
-        delete sources[key];
+        delete sources2[key];
       if (per.some((p) => p.buffed.has(key)))
         buffed.add(key);
       const moved = `moved:${key}`;
@@ -759,7 +759,7 @@ function rowValues(snap, { mv, avg }, members = []) {
   };
   const any = (pick) => fs.some(pick);
   if (dealsDamage)
-    sources.avg = [
+    sources2.avg = [
       factor(f.scaling === null ? "" : STAT_SOURCE[f.scaling] ?? SCALING_NAME[f.scaling], "Final Stat", (x) => x.finalStat, false),
       { source: snap.action.name, label: "Motion Value", value: floor4(fs.reduce((n, x) => n + x.finalMv, 0)), mult: true },
       factor("buffs", "Damage Bonus", (x) => x.bonusFactor, true),
@@ -777,12 +777,12 @@ function rowValues(snap, { mv, avg }, members = []) {
   if (!(members.length ? members : [snap]).some((m) => m.action.bullets.length)) {
     for (const key of STAT_COLUMNS) {
       raw[key] = null;
-      delete sources[key];
+      delete sources2[key];
       buffed.delete(key);
     }
     delete raw["empty:scaler"];
   }
-  return { raw, sources, buffed };
+  return { raw, sources: sources2, buffed };
 }
 function buildReport(lines) {
   const columns = [
@@ -840,7 +840,7 @@ function buildReport(lines) {
   };
   const rows = lines.map((line) => {
     const snap = line.snap;
-    const { raw, sources, buffed } = rowValues(snap, { mv: line.mv, avg: line.avg }, line.members ?? []);
+    const { raw, sources: sources2, buffed } = rowValues(snap, { mv: line.mv, avg: line.avg }, line.members ?? []);
     raw.action = line.id;
     if (tagOf(snap))
       raw["tag:action"] = tagOf(snap);
@@ -850,7 +850,7 @@ function buildReport(lines) {
     return {
       line,
       raw,
-      sources,
+      sources: sources2,
       buffed,
       // `snap.type`, not `action.type`: the type it was actually evaluated as (typeOverride)
       info: actionInfo(snap.action, snap.type, snap.source),
@@ -1471,6 +1471,113 @@ var routeTeam = () => {
   return key && results.has(key) ? key : null;
 };
 
+// dist/src/page/portrait-assets.js
+var PORTRAITS = {
+  "Aemeath": "5ec9f745add09367.webp",
+  "Aero Rover": "e0c9433745a00696.webp",
+  "Augusta": "e6fc8431619a553b.webp",
+  "Brant": "9441af5b5fb83713.webp",
+  "Buling": "7a5ecec20b4b5847.webp",
+  "Camellya": "bf65bf3d688c2472.webp",
+  "Cantarella": "866ff539a96ab654.webp",
+  "Carlotta": "85fe77e46d3e20fa.webp",
+  "Cartethyia": "0f44bd245d0305e5.webp",
+  "Changli": "c93dfbaa347d4b19.webp",
+  "Chisa": "ddeb17d906c74a74.webp",
+  "Ciaccona": "17b1dffb465211dd.webp",
+  "Danjin": "bfc5862e913f7e78.webp",
+  "Denia": "649ffe0c1e3bbc52.webp",
+  "Electro Rover": "e0c9433745a00696.webp",
+  "Encore": "a54a6d5cc619100b.webp",
+  "Galbrena": "564956493ed820fe.webp",
+  "Havoc Rover": "e0c9433745a00696.webp",
+  "Hiyuki": "13bc6fd1d41eefc5.webp",
+  "Hsin": "7e632ef70615a320.webp",
+  "Iuno": "ded4152344b2fd53.webp",
+  "Jianxin": "8db15a0ad3979726.webp",
+  "Jingran": "c2891639a2ef3ed9.webp",
+  "Jinhsi": "6e875b6d04012079.webp",
+  "Jiyan": "fa87ea7fb912efef.webp",
+  "Lucilla": "13ecea4951119921.webp",
+  "Lucy": "12cb3961d478ff17.webp",
+  "Lupa": "f8619b4c03c3cad9.webp",
+  "Luuk Herssen": "9085a824ce54b5b3.webp",
+  "Lynae": "dfa20dcf41d67966.webp",
+  "Mornye": "d4e353eb1a791a35.webp",
+  "Mortefi": "07e1f02356dd1865.webp",
+  "Phoebe": "23a64e09ad0c2d4d.webp",
+  "Phrolova": "53b9e2e1e4e1711a.webp",
+  "Qingxiao": "2f78c31ad60503d0.webp",
+  "Qiuyuan": "6919fed61679a99d.webp",
+  "Rebecca": "d762aeaf1266ac9a.webp",
+  "Roccia": "9fbb33e2129e71a4.webp",
+  "Sanhua": "7092cb12ab81ae13.webp",
+  "Shorekeeper": "264188ad698819c1.webp",
+  "Sigrika": "ecbcbd022f40cbb2.webp",
+  "Spectro Rover": "e0c9433745a00696.webp",
+  "Suisui": "579257cbe2358892.webp",
+  "Suoming": "d8601764867105a6.webp",
+  "Verina": "97e6d54bc983adc9.webp",
+  "Xiangli Yao": "9b0a33480e7b8209.webp",
+  "Xuanling": "28c5d88fe54d342f.webp",
+  "Yinlin": "08e4fa09c618158e.webp",
+  "Zani": "7c347eaa3f6ca619.webp",
+  "Zhezhi": "2f33e76d65a7c73f.webp"
+};
+
+// dist/src/page/portraits.js
+var PORTRAIT_CACHE = "wuwa-character-portraits-v1";
+var sources = /* @__PURE__ */ new Map();
+function portrait(name) {
+  const file = Object.hasOwn(PORTRAITS, name) ? PORTRAITS[name] : void 0;
+  return file ? `<img class="character-portrait" data-portrait="${file}" alt="" width="24" height="24" decoding="async">` : "";
+}
+function portraitSource(source) {
+  const existing = sources.get(source);
+  if (existing)
+    return existing;
+  const pending = readPortrait(source).catch((error) => {
+    sources.delete(source);
+    throw error;
+  });
+  sources.set(source, pending);
+  return pending;
+}
+async function readPortrait(source) {
+  let cache;
+  let response;
+  try {
+    cache = await caches.open(PORTRAIT_CACHE);
+    response = await cache.match(source);
+  } catch {
+  }
+  if (!response) {
+    response = await fetch(source, { cache: "force-cache" });
+    if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) {
+      throw new Error(`Portrait request failed: ${response.status}`);
+    }
+    try {
+      await cache?.put(source, response.clone());
+    } catch {
+    }
+  }
+  return URL.createObjectURL(await response.blob());
+}
+function loadPortraits(root) {
+  for (const image of root.querySelectorAll("img[data-portrait]:not([src])")) {
+    const source = new URL(`./assets/portraits/${image.dataset.portrait}`, document.baseURI).href;
+    image.addEventListener("error", () => {
+      image.style.visibility = "hidden";
+    }, { once: true });
+    void portraitSource(source).then((url) => {
+      if (image.isConnected)
+        image.src = url;
+    }).catch(() => {
+      image.style.visibility = "hidden";
+    });
+  }
+}
+
 // dist/src/page/panels.js
 var esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 var coarse = matchMedia("(pointer: coarse)").matches;
@@ -1849,7 +1956,7 @@ function loadoutTable(run, needs) {
   const equipped = new Set(builds.flatMap(({ member: member2, combo, erRolls: n }) => member2.loadout.pieces(combo.weapon, combo.echo, combo.mainstat, combo.sequence, combo.matrix !== null, combo.highSubs, n)));
   const head = `<div class="rtrow rthead"><div class="c lbl">Resonator</div>` + builds.map((b) => {
     const hover = resonatorPopover(run, kitOf(b), equipped, b.member.name, slotHue);
-    return `<div class="c mem${hover ? " has" : ""}"${hover} style="--mem:${b.member.color}">${esc(b.member.name)}</div>`;
+    return `<div class="c mem${hover ? " has" : ""}"${hover} style="--mem:${b.member.color}"><span class="character-label">${portrait(b.member.name)}${esc(b.member.name)}</span></div>`;
   }).join("") + `</div>`;
   const row = (label, cells) => `<div class="rtrow"><div class="c lbl">${esc(label)}</div>${cells.join("")}</div>`;
   const gearCell = (owner, g, pieces) => {
@@ -1928,7 +2035,7 @@ function dprTable(run, lines) {
     ]);
   const head = `<div class="rtrow rthead"><div class="c"></div>` + sections.slice(0, whole).map((n) => `<div class="c num">${n}</div>`).join("") + `<div class="c num tot">Total</div></div>`;
   const valueCell = (sec, value, key, cls = "") => sec ? `<div class="c num dist-cell${cls}${key === selected2 ? " sel" : ""}" data-dist="${key}">${fmt(value)}</div>` : `<div class="c num${cls}">${fmt(value)}</div>`;
-  const rowLabel = (slot, mem) => `<div class="c name"${mem}${lines ? ` data-dist-row="${esc(slot)}"` : ""}>${esc(slot)}</div>`;
+  const rowLabel = (slot, mem) => `<div class="c name"${mem}${lines ? ` data-dist-row="${esc(slot)}"` : ""}><span class="character-label">${portrait(slot)}${esc(slot)}</span></div>`;
   const dataRow = (slot, color) => {
     const own = ownTotal(slot);
     return `<div class="rtrow">` + rowLabel(slot, ` style="--mem:${color}"`) + run.sectionBySlot.map((by, i) => valueCell(lines?.[i], by.get(slot) ?? 0, `${slot}|${i}`)).join("") + valueCell(flat, own, `${slot}|${whole}`, " tot") + `</div>`;
@@ -1960,6 +2067,7 @@ function wireSourcePanels(root) {
   const place2 = (cell2, pop) => {
     if (pop.parentElement !== document.body)
       document.body.appendChild(pop);
+    loadPortraits(pop);
     pop.style.visibility = "hidden";
     pop.style.display = "block";
     const c = rect(cell2);
@@ -2459,8 +2567,10 @@ function cycleSearch(step) {
 var searchChoice = () => searchHits()[searchAt < 0 ? 0 : searchAt];
 function drawSearch() {
   const box = document.getElementById("searchResults");
-  if (box)
+  if (box) {
     box.innerHTML = searchResults();
+    loadPortraits(box);
+  }
 }
 function searchResults() {
   if (!searchText.trim())
@@ -2478,8 +2588,9 @@ function searchResults() {
   if (!hits.length)
     return `<div class="sresult none">no matches</div>`;
   return hits.map(({ kind, value, axis, resonator }, i) => {
+    const owner = kind === "resonator" ? value : resonator ?? (kind === "sequence" || kind === "refine" ? tagOwner(value) : "");
     const hue = (kind === "resonator" ? RESONATOR_HUE.get(value) : kind === "compare" || kind === "matrix" ? RESONATOR_HUE.get(resonator ?? "") : kind === "sequence" ? RESONATOR_HUE.get(tagOwner(value)) : void 0) ?? TUNE_BREAK_ENEMY.color;
-    return `<button type="button" class="sresult${i === searchAt ? " sel" : ""}" data-kind="${kind}" data-value="${esc(value)}"` + (axis ? ` data-axis="${axis}"` : "") + (resonator ? ` data-resonator="${esc(resonator)}"` : "") + ` style="--mem:${hue}" title="${kind === "compare" ? `Compare ${esc(resonator ?? "")}'s ${esc(AXIS_LABEL[axis].toLowerCase())}` : kind === "matrix" ? `Run ${esc(resonator ?? "")}'s Matrix in every team they field` : `Add ${esc(value)} to the filters`}. The chip it makes is where it comes back off."><span class="sact inc"><span class="sname">${esc(value)}<span class="skind">${KIND_LABEL[kind]}</span></span></span></button>`;
+    return `<button type="button" class="sresult${i === searchAt ? " sel" : ""}" data-kind="${kind}" data-value="${esc(value)}"` + (axis ? ` data-axis="${axis}"` : "") + (resonator ? ` data-resonator="${esc(resonator)}"` : "") + ` style="--mem:${hue}" title="${kind === "compare" ? `Compare ${esc(resonator ?? "")}'s ${esc(AXIS_LABEL[axis].toLowerCase())}` : kind === "matrix" ? `Run ${esc(resonator ?? "")}'s Matrix in every team they field` : `Add ${esc(value)} to the filters`}. The chip it makes is where it comes back off."><span class="sact inc"><span class="sname">${portrait(owner)}${esc(value)}<span class="skind">${KIND_LABEL[kind]}</span></span></span></button>`;
   }).join("");
 }
 var COST_HELP = [
@@ -2540,23 +2651,23 @@ function resonatorChips() {
   const bucket = (mode) => mode === "include" ? inc : exc;
   const MODE_TITLE = { include: "these", exclude: "none of these" };
   for (const [name, mode] of resonatorFilters) {
-    bucket(mode).push(`<button type="button" class="rchip" data-resonator="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="${esc(name)} \u2014 teams fielding ${MODE_TITLE[mode]}. ${CLICK} to remove.">${esc(name)}</button>`);
+    bucket(mode).push(`<button type="button" class="rchip" data-resonator="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="${esc(name)} \u2014 teams fielding ${MODE_TITLE[mode]}. ${CLICK} to remove.">${portrait(name)}${esc(name)}</button>`);
   }
   for (const [kind, map] of Object.entries(OPTION_FILTER_MAPS)) {
     for (const [name, mode] of map) {
       const hue = kind === "sequence" || kind === "refine" ? RESONATOR_HUE.get(tagOwner(name)) : void 0;
-      bucket(mode).push(`<button type="button" class="rchip" data-kind="${kind}" data-value="${esc(name)}"` + (hue ? ` style="--mem:${hue}"` : "") + ` title="${esc(name)} \u2014 rows using ${MODE_TITLE[mode]}. ${CLICK} to remove.">${esc(name)}</button>`);
+      bucket(mode).push(`<button type="button" class="rchip" data-kind="${kind}" data-value="${esc(name)}"` + (hue ? ` style="--mem:${hue}"` : "") + ` title="${esc(name)} \u2014 rows using ${MODE_TITLE[mode]}. ${CLICK} to remove.">${kind === "sequence" || kind === "refine" ? portrait(tagOwner(name)) : ""}${esc(name)}</button>`);
     }
   }
   for (const s of filters.scoped) {
-    inc.push(`<button type="button" class="rchip" data-scoped="${esc(scopedKey(s))}" style="--mem:${RESONATOR_HUE.get(s.resonator) ?? TUNE_BREAK_ENEMY.color}" title="Comparing ${esc(scopedLabel(s))}'s ${AXIS_LABEL[s.axis].toLowerCase()}. ${CLICK} to remove.">${esc(scopedLabel(s))} ${AXIS_LABEL[s.axis]}</button>`);
+    inc.push(`<button type="button" class="rchip" data-scoped="${esc(scopedKey(s))}" style="--mem:${RESONATOR_HUE.get(s.resonator) ?? TUNE_BREAK_ENEMY.color}" title="Comparing ${esc(scopedLabel(s))}'s ${AXIS_LABEL[s.axis].toLowerCase()}. ${CLICK} to remove.">${portrait(s.resonator)}${esc(scopedLabel(s))} ${AXIS_LABEL[s.axis]}</button>`);
   }
   for (const name of filters.matrix) {
-    inc.push(`<button type="button" class="rchip" data-matrix="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="${esc(name)} runs their Matrix in every team. ${esc(MATRIX_HELP)} ${CLICK} to remove.">${esc(name)} Matrix</button>`);
+    inc.push(`<button type="button" class="rchip" data-matrix="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="${esc(name)} runs their Matrix in every team. ${esc(MATRIX_HELP)} ${CLICK} to remove.">${portrait(name)}${esc(name)} Matrix</button>`);
   }
   for (const axis of AXES) {
     for (const name of filters[axis]) {
-      inc.push(`<button type="button" class="rchip" data-axis="${axis}" data-resonator="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="Comparing ${esc(name)}'s ${AXIS_LABEL[axis].toLowerCase()}. ${CLICK} to remove.">${esc(name)} ${AXIS_LABEL[axis]}</button>`);
+      inc.push(`<button type="button" class="rchip" data-axis="${axis}" data-resonator="${esc(name)}" style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}" title="Comparing ${esc(name)}'s ${AXIS_LABEL[axis].toLowerCase()}. ${CLICK} to remove.">${portrait(name)}${esc(name)} ${AXIS_LABEL[axis]}</button>`);
     }
   }
   const section = (label, chips2) => chips2.length ? `<div class="chipsec"><span class="chiplabel">${label}</span><div class="chiprow">${chips2.join("")}</div></div>` : "";
@@ -3006,7 +3117,7 @@ function comparisonTable(rows) {
     const memberCell = (m, combo, i) => {
       const seqTag = sequenceTag(m, combo);
       const refTag = axisUsed(m, filters, "refines") && !openAt.weapons[i] ? refineTag(m, combo) : null;
-      const name = `<div class="c name res" data-resonator="${esc(m.name)}"` + (seqTag ? ` data-sequence="${esc(seqTag)}" data-seq-gate="${combo.sequence}"` : "") + (refTag ? ` data-refine="${esc(refTag)}" data-ref-gate="${combo.weapon.refinement}"` : "") + ` style="--mem:${m.color};color:${m.color}"><span class="res-label">${esc(memberLabel(m, combo))}</span></div>`;
+      const name = `<div class="c name res" data-resonator="${esc(m.name)}"` + (seqTag ? ` data-sequence="${esc(seqTag)}" data-seq-gate="${combo.sequence}"` : "") + (refTag ? ` data-refine="${esc(refTag)}" data-ref-gate="${combo.weapon.refinement}"` : "") + ` style="--mem:${m.color};color:${m.color}">` + portrait(m.name) + `<span class="res-label">${esc(memberLabel(m, combo))}</span></div>`;
       const dpr = dprAt(i) ? `<div class="c num slotdpr" style="--mem:${m.color}">${fmt(personalFigure(run, m.name))}</div>` : "";
       const seqCmp = cmpAt("sequences", i) ? `<div class="c num slotcompare" style="--mem:${m.color}">${axisOpen(m, filters, "sequences") ? gearCompare(run, i, "sequences") : ""}</div>` : "";
       const refCmp = cmpAt("refines", i) ? `<div class="c num slotcompare" style="--mem:${m.color}">${compares(m, filters, "refines", combo) ? gearCompare(run, i, "refines") : ""}</div>` : "";
@@ -3065,7 +3176,7 @@ function comparisonTable(rows) {
     wide.total = widest(wide.total, teamText(run));
     wide.pct = widest(wide.pct, ranks[i].pct);
   });
-  const ghostPos = (i) => `<div class="c name res"><span class="res-label">${esc(wide.name[i])}</span></div>` + (cmpAt("sequences", i) ? `<div class="c num slotcompare">${esc(wide.seqcmp[i])}</div>` : "") + (cmpAt("refines", i) ? `<div class="c num slotcompare">${esc(wide.refcmp[i])}</div>` : "") + GEAR_AXES.map((axis) => openAt[axis][i] ? `<div class="c option">${esc(wide.gear[axis][i])}</div>${cmpAt(axis, i) ? `<div class="c num slotcompare">${esc(wide.cmp[axis][i])}</div>` : ""}` : "").join("") + (dprAt(i) ? `<div class="c num slotdpr">${esc(wide.dpr[i])}</div>` : "");
+  const ghostPos = (i) => `<div class="c name res"><span class="character-portrait" aria-hidden="true"></span><span class="res-label">${esc(wide.name[i])}</span></div>` + (cmpAt("sequences", i) ? `<div class="c num slotcompare">${esc(wide.seqcmp[i])}</div>` : "") + (cmpAt("refines", i) ? `<div class="c num slotcompare">${esc(wide.refcmp[i])}</div>` : "") + GEAR_AXES.map((axis) => openAt[axis][i] ? `<div class="c option">${esc(wide.gear[axis][i])}</div>${cmpAt(axis, i) ? `<div class="c num slotcompare">${esc(wide.cmp[axis][i])}</div>` : ""}` : "").join("") + (dprAt(i) ? `<div class="c num slotdpr">${esc(wide.dpr[i])}</div>` : "");
   const ghost = () => `<div class="trow tghost" aria-hidden="true">` + ghostPos(0) + ghostPos(1) + ghostPos(2) + `<div class="c num total">${esc(widest(wide.total, TEAM_HEAD[teamMode]))}</div><div class="c num total baseline">${esc(wide.pct)}</div><div class="c gotodetail">view rotation<span class="arrow">\u203A</span></div></div>`;
   tableView = { sorted, ranks, head, ghost, rowHtml, lines, extra };
   return `<main><div class="tclayout"><aside class="tcside">${comparisonFilters()}</aside><div class="tcbody"><h2 class="summary-label" id="teamCount">${fmt(sorted.length)} teams<span class="hint">${CLICK} on a Resonator to filter and compare sequences, weapons, echoes</span></h2><div class="tcwrap"><div class="tgrid${hueShown ? " hued" : ""}" style="${gridStyle}">${head}${ghost()}</div></div></div></div></main>`;
@@ -3136,6 +3247,7 @@ function drawWindow(force = false, scrollTop) {
     body += view.rowHtml(key, run, view.ranks[i]);
   }
   grid.innerHTML = view.head + view.ghost() + spacer(0, from) + body + spacer(to, n);
+  loadPortraits(grid);
   drawnFrom = from;
   drawnTo = to;
   if (!measured && to - from >= 2) {
@@ -3217,6 +3329,7 @@ function renderComparison() {
   clearPops();
   const scrollTop = app2.querySelector(".tgrid") ? app2.querySelector("main")?.scrollTop ?? 0 : tableScrollTop;
   app2.innerHTML = comparisonTable(visibleRows);
+  loadPortraits(app2);
   app2.className = "";
   measured = false;
   drawnFrom = drawnTo = -1;
@@ -3639,7 +3752,7 @@ var TAG_NOTE = {
 function stepRow(columns, row, slotHue, gearByMember, { part = false, caret = true } = {}) {
   return columns.map((col) => {
     const v = row.raw[col.key];
-    const sources = row.sources[col.key];
+    const sources2 = row.sources[col.key];
     let attr = "";
     if (isRunning(col.key)) {
       if ("line" in row && row.line.aggregate)
@@ -3649,7 +3762,7 @@ function stepRow(columns, row, slotHue, gearByMember, { part = false, caret = tr
       const before = Number(row.raw[`before:${col.key}`]) || 0;
       if (!spend)
         attr = ` data-val="${Number(v) || 0}" data-before="${before}"`;
-      const fed = (sources ?? []).some((r) => r.section !== OFFTUNE_RATE && r.section !== ENERGY_RATE);
+      const fed = (sources2 ?? []).some((r) => r.section !== OFFTUNE_RATE && r.section !== ENERGY_RATE);
       if (!fed && Math.abs((Number(v) || 0) - before) < 1e-9)
         return cell(col, { attr });
     }
@@ -3669,7 +3782,7 @@ function stepRow(columns, row, slotHue, gearByMember, { part = false, caret = tr
     if (col.key.startsWith("gauge:") && Number(row.raw[`short:${col.key}`]))
       cls.push("negative");
     const text = esc(fmt(v, digitsOf(row.raw, col), PAD_DIGITS_COLUMNS.has(col.key), GROUPED_COLUMNS.has(col.key))) + (col.percent && typeof v === "number" ? "%" : "") + gaugeSuffix(row.raw, col.key);
-    let html = sources && text ? `<span class="has">${text}</span>` : text;
+    let html = sources2 && text ? `<span class="has">${text}</span>` : text;
     if (col.key === "action" && caret && !part && "parts" in row && row.parts.length) {
       html = `${html}<span class="caret">\u25B8</span>`;
     }
@@ -3692,7 +3805,7 @@ function stepRow(columns, row, slotHue, gearByMember, { part = false, caret = tr
       const gear = gearByMember.get(snap.member) ?? [];
       pop = buffsPopover(snap.member, gear, snap.heldLocal, snap.heldGlobal, snap.heldEnemy, slotHue);
     } else if (text) {
-      pop = popover(col, sources, row.raw[`moved:${col.key}`] ?? v, slotHue, suffix, String(row.raw[`empty:${col.key}`] ?? ""));
+      pop = popover(col, sources2, row.raw[`moved:${col.key}`] ?? v, slotHue, suffix, String(row.raw[`empty:${col.key}`] ?? ""));
     }
     const mem = col.key === "member" ? rowHue("line" in row ? row.line.snap : row.snap, slotHue) : slotHue.get(String(v)) ?? FALLBACK_HUE;
     const style = col.key === "member" ? `--mem:${mem};color:${mem}` : col.key === "avg" ? `--mem:${slotHue.get(String(row.raw["member"] ?? "")) ?? FALLBACK_HUE}` : "";
@@ -3923,6 +4036,7 @@ function renderDetail(key) {
   clearPops();
   const run = results.get(key);
   app3.innerHTML = page(run);
+  loadPortraits(app3);
   app3.className = "";
   wireColumnDrag(app3, detailFor(run).report.columns);
   wireCellSelect(app3);

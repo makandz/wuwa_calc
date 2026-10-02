@@ -951,6 +951,25 @@ main {
 .trow .c.name.res { cursor: pointer; display: flex; align-items: flex-start; gap: 7px; }
 .trow .c.name.res .res-label { overflow: hidden; text-overflow: ellipsis; }
 
+/* Fixed space for portraits keeps row sizes stable while the cached image loads. */
+.character-portrait {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  object-fit: contain;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.trow .character-portrait { margin-block: -3.5px; }
+.character-label { display: inline-flex; align-items: center; gap: 7px; }
+.rchip .character-portrait, .sresult .character-portrait {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+.sresult .sname { align-items: center; }
+
 /* a weapon/echo/mainstat pick's own column: the same member colour wash as their name cell,
    `--mem` set alongside it in index.js's own optionCell(), so a pick reads as "this row's member"
    at a glance the same way the name column does. Clickable exactly like a resonator's own name —

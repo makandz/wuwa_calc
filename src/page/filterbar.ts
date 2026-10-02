@@ -6,6 +6,7 @@ import { TUNE_BREAK_ENEMY } from "../shared/tunebreak.js";
 import { eligibleWeapons, scopedKey, axisUsed, weaponBase, echoLabel, axisOpen, AXES } from "../solver.js";
 import type { Axis, TeamCost, ScopedCompare } from "../solver.js";
 import { TEAMS, RESONATOR_HUE, filters, resonatorFilters, OPTION_FILTER_MAPS, sequenceTagsOf, tagOwner, comparable, MATRIX_RESONATORS } from "./model.js";
+import { portrait, loadPortraits } from "./portraits.js";
 import type { ResonatorFilter, OptionKind } from "./model.js";
 import { esc, CLICK } from "./panels.js";
 import { MAKAN_COST_LABEL, MAKAN_COST_OVERRIDES } from "../costs.js";
@@ -131,7 +132,10 @@ export const searchChoice = (): SearchHit | undefined =>
 
 export function drawSearch(): void {
   const box = document.getElementById("searchResults");
-  if (box) box.innerHTML = searchResults();
+  if (box) {
+    box.innerHTML = searchResults();
+    loadPortraits(box);
+  }
 }
 
 function searchResults(): string {
@@ -143,6 +147,7 @@ function searchResults(): string {
   const hits = searchHits();
   if (!hits.length) return `<div class="sresult none">no matches</div>`;
   return hits.map(({ kind, value, axis, resonator }, i) => {
+    const owner = kind === "resonator" ? value : resonator ?? (kind === "sequence" || kind === "refine" ? tagOwner(value) : "");
     const hue = (kind === "resonator" ? RESONATOR_HUE.get(value)
       : kind === "compare" || kind === "matrix" ? RESONATOR_HUE.get(resonator ?? "")
       : kind === "sequence" ? RESONATOR_HUE.get(tagOwner(value)) : undefined) ?? TUNE_BREAK_ENEMY.color;
@@ -155,7 +160,7 @@ function searchResults(): string {
       + ` title="${kind === "compare" ? `Compare ${esc(resonator ?? "")}'s ${esc(AXIS_LABEL[axis!].toLowerCase())}`
         : kind === "matrix" ? `Run ${esc(resonator ?? "")}'s Matrix in every team they field`
         : `Add ${esc(value)} to the filters`}. The chip it makes is where it comes back off.">`
-      + `<span class="sact inc"><span class="sname">${esc(value)}<span class="skind">${KIND_LABEL[kind]}</span></span></span></button>`;
+      + `<span class="sact inc"><span class="sname">${portrait(owner)}${esc(value)}<span class="skind">${KIND_LABEL[kind]}</span></span></span></button>`;
   }).join("");
 }
 
@@ -251,7 +256,7 @@ function resonatorChips(): string {
     bucket(mode).push(`<button type="button" class="rchip" data-resonator="${esc(name)}"`
       + ` style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}"`
       + ` title="${esc(name)} — teams fielding ${MODE_TITLE[mode]}. ${CLICK} to remove.">`
-      + `${esc(name)}</button>`);
+      + `${portrait(name)}${esc(name)}</button>`);
   }
   for (const [kind, map] of Object.entries(OPTION_FILTER_MAPS) as [OptionKind, Map<string, ResonatorFilter>][]) {
     for (const [name, mode] of map) {
@@ -259,27 +264,27 @@ function resonatorChips(): string {
       bucket(mode).push(`<button type="button" class="rchip" data-kind="${kind}" data-value="${esc(name)}"`
         + (hue ? ` style="--mem:${hue}"` : "")
         + ` title="${esc(name)} — rows using ${MODE_TITLE[mode]}. ${CLICK} to remove.">`
-        + `${esc(name)}</button>`);
+        + `${kind === "sequence" || kind === "refine" ? portrait(tagOwner(name)) : ""}${esc(name)}</button>`);
     }
   }
   for (const s of filters.scoped) {
     inc.push(`<button type="button" class="rchip" data-scoped="${esc(scopedKey(s))}"`
       + ` style="--mem:${RESONATOR_HUE.get(s.resonator) ?? TUNE_BREAK_ENEMY.color}"`
       + ` title="Comparing ${esc(scopedLabel(s))}'s ${AXIS_LABEL[s.axis].toLowerCase()}. ${CLICK} to remove.">`
-      + `${esc(scopedLabel(s))} ${AXIS_LABEL[s.axis]}</button>`);
+      + `${portrait(s.resonator)}${esc(scopedLabel(s))} ${AXIS_LABEL[s.axis]}</button>`);
   }
   for (const name of filters.matrix) {
     inc.push(`<button type="button" class="rchip" data-matrix="${esc(name)}"`
       + ` style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}"`
       + ` title="${esc(name)} runs their Matrix in every team. ${esc(MATRIX_HELP)} ${CLICK} to remove.">`
-      + `${esc(name)} Matrix</button>`);
+      + `${portrait(name)}${esc(name)} Matrix</button>`);
   }
   for (const axis of AXES) {
     for (const name of filters[axis]) {
       inc.push(`<button type="button" class="rchip" data-axis="${axis}" data-resonator="${esc(name)}"`
         + ` style="--mem:${RESONATOR_HUE.get(name) ?? TUNE_BREAK_ENEMY.color}"`
         + ` title="Comparing ${esc(name)}'s ${AXIS_LABEL[axis].toLowerCase()}. ${CLICK} to remove.">`
-        + `${esc(name)} ${AXIS_LABEL[axis]}</button>`);
+        + `${portrait(name)}${esc(name)} ${AXIS_LABEL[axis]}</button>`);
     }
   }
   const section = (label: string, chips: string[]): string =>

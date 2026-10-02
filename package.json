@@ -10,6 +10,7 @@
     "watch": "tsc --watch",
     "dev": "python dev.py",
     "precompute": "node dist/src/precompute.js",
+    "portraits:sync": "node scripts/sync-portraits.mjs",
     "bundle": "node -e \"require('node:fs').rmSync('dist/bundle',{recursive:true,force:true})\" && esbuild dist/src/index.js dist/src/solver.js --bundle --splitting --format=esm --outdir=dist/bundle --outbase=dist/src"
   },
   "repository": {

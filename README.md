@@ -25,6 +25,14 @@ include the selected cost preset, and the original presets remain available.
 Rotations that require higher sequences or cannot meet energy or Crit Rate requirements are
 omitted from this preset. This includes Jianxin's S2 rotation and Roccia's S6-only variant.
 
+Character portraits come from Encore's `RoleHeadIcon` field and ship in `assets/portraits/`.
+Run `npm run portraits:sync` to refresh the images and `src/page/portrait-assets.ts`, then rebuild.
+Image filenames contain a SHA-256 content hash, so changed images get a new cache key. The page
+stores loaded portraits in the `wuwa-character-portraits-v1` Cache Storage cache and reads that
+cache first on subsequent visits, without a network request or expiry. If storage is unavailable,
+images still load using the HTTP cache. Browsers can evict saved images or users can clear site
+data; the next visit downloads them again. Include `assets/` when publishing the site.
+
 | path | role |
 | --- | --- |
 | `src/engine/gear.ts` | every equippable thing and the containers naming a build: the `Gear` tree, `EchoLoadout`, `Loadout` |
