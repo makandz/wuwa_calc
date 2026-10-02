@@ -32299,11 +32299,30 @@ var PRIMARY_TEAM = ALL_TEAMS.map(() => false);
 var teamKey = (index) => `t${index}`;
 var teamAt = (key) => /^t\d+$/.test(key) ? ALL_TEAMS[Number(key.slice(1))] : void 0;
 
+// dist/src/costs.js
+var DEFAULT_TEAM_COST = "makan";
+var MAKAN_COST_LABEL = "Makan's costs";
+var MAKAN_DEFAULT_COST = { sequence: 0, signature: false, refinement: 1 };
+var MAKAN_COST_OVERRIDES = {
+  Phrolova: { sequence: 2, signature: true, refinement: 1 },
+  Hsin: { sequence: 0, signature: true, refinement: 1 },
+  Lucy: { sequence: 3, signature: true, refinement: 1 },
+  Mornye: { sequence: 1, signature: false, refinement: 1 },
+  Chisa: { sequence: 0, signature: true, refinement: 1 },
+  Iuno: { sequence: 0, signature: true, refinement: 1 },
+  Cartethyia: { sequence: 0, signature: true, refinement: 1 },
+  Ciaccona: { sequence: 0, signature: true, refinement: 1 },
+  Shorekeeper: { sequence: 2, signature: false, refinement: 1 },
+  Denia: { sequence: 0, signature: false, refinement: 1, weapon: "Stringmaster" }
+};
+var makanCost = (name) => MAKAN_COST_OVERRIDES[name] ?? MAKAN_DEFAULT_COST;
+
 // dist/src/solver.js
 var loadoutName = (l) => l.mode ? `${l.resonator.name} (${l.mode.name.split(" ").pop()})` : l.resonator.name;
 var member = (loadout, mainDps = false) => ({ name: loadout.resonator.name, color: loadout.resonator.color, loadout, mainDps });
 var AXES = ["weapons", "echoes", "mainstats", "sequences", "refines", "substats"];
 var TEAM_COSTS = [
+  "makan",
   "s0r0",
   "s0r1mdps",
   "s0r1",
@@ -32331,7 +32350,7 @@ function echoLines(l, echo) {
 var echoLabel = (l, echo) => echoLines(l, echo).join(" + ");
 var defaultFilters = () => ({
   matrix: [],
-  cost: "s0r1",
+  cost: DEFAULT_TEAM_COST,
   weapons: [],
   echoes: [],
   mainstats: [],
@@ -32352,6 +32371,13 @@ var bestKey = (teamKey2, members, filters) => {
   return `${teamKey2}|${filters.cost}|${members.map(one).join(",")}`;
 };
 var picksKey = (teamKey2, members, filters) => `${teamKey2}|${filters.cost}|${members.map((m) => (matrixOn(m, filters) ? "m" : "") + (axisOpen(m, filters, "weapons") ? "1" : "0")).join("")}`;
+var UnavailableBuild = class extends Error {
+  picks;
+  constructor(message, picks) {
+    super(message);
+    this.picks = picks;
+  }
+};
 var comboOf = (l, p) => {
   const matrix2 = p.matrix && l.resonator.matrix ? l.resonator.matrix : null;
   return {
@@ -32373,12 +32399,16 @@ var grantToOne = (cost) => cost.endsWith("mdps");
 function costLevel(m, cost, holds) {
   const l = m.loadout;
   const max = l.sequences.length;
+  if (cost === "makan") {
+    const at2 = makanCost(m.name).sequence;
+    return at2 < l.minSequence || at2 > max ? null : at2;
+  }
   if (!max)
     return l.minSequence ? null : 0;
   const at = Math.min(Math.max(Math.min(baseSequence(l.resonator), max), costGrant(cost, holds).sequence), max);
   return at < l.minSequence ? null : at;
 }
-var costRefine = (m, weapon, cost, holds) => Math.min(costGrant(cost, holds).refine, m.loadout.refinements[weapon].length - 1);
+var costRefine = (m, weapon, cost, holds) => Math.min(cost === "makan" ? makanCost(m.name).refinement - 1 : costGrant(cost, holds).refine, m.loadout.refinements[weapon].length - 1);
 function refineLevels(m, filters, p) {
   const ranks = m.loadout.refinements[p.weapon];
   if (compares(m, filters, "refines", gateOf(m.loadout, p)))
@@ -32393,7 +32423,7 @@ function sequenceLevels(m, filters, holds = true) {
     return at === null ? [] : [at];
   }
   const base = Math.min(baseSequence(l.resonator), max);
-  const from = Math.max(l.minSequence, l.resonator.tier === 2 ? 0 : base);
+  const from = Math.max(l.minSequence, filters.cost === "makan" || l.resonator.tier === 2 ? 0 : base);
   return Array.from({ length: max - from + 1 }, (_, i) => from + i);
 }
 var hasBuild = (m, filters) => eligibleWeapons(m, filters).length > 0 && sequenceLevels(m, filters, !grantToOne(filters.cost)).length > 0;
@@ -32406,9 +32436,17 @@ function weaponOptions(m, filters, sig) {
   const l = m.loadout;
   if (axisOpen(m, filters, "weapons"))
     return l.weapons.map((_, i) => i);
+  if (filters.cost === "makan") {
+    const own = makanCost(m.name);
+    if (own.weapon) {
+      const at = l.weapons.findIndex((w) => weaponBase(w) === own.weapon);
+      return at < 0 ? [] : [at];
+    }
+    return [own.signature ? 0 : standardWeapon(l)];
+  }
   return [sig ? 0 : standardWeapon(l)];
 }
-var sigForAll = (cost) => cost !== "s0r0" && cost !== "s0r1mdps";
+var sigForAll = (cost) => cost !== "makan" && cost !== "s0r0" && cost !== "s0r1mdps";
 var sigAllowed = (i, holder, cost) => sigForAll(cost) || cost === "s0r1mdps" && i === holder;
 var sigHolder = (members, picks) => {
   const i = picks.findIndex((p, k) => isSignature(members[k].loadout, p.weapon));
@@ -32593,7 +32631,7 @@ function optimizeTeam(teamKey2, members, filters) {
   for (const holder of holders) {
     const options = members.map((m, i) => {
       const holds = !one || holder === i;
-      const base = sequenceLevels(m, filters, !one)[0];
+      const base = filters.cost === "makan" ? costLevel(m, filters.cost, !one) ?? sequenceLevels(m, filters, !one)[0] : sequenceLevels(m, filters, !one)[0];
       const level = one && holds ? costLevel(m, filters.cost, true) : null;
       const sequence = level === null ? base : Math.max(level, base);
       const list = [];
@@ -32628,10 +32666,10 @@ function optimizeTeam(teamKey2, members, filters) {
     const rolls = erRollsFor(teamKey2, members, combo)[i];
     const built = members.map((m, j) => `${m.name} s${picks[j].sequence}r${picks[j].refine + 1} ${m.loadout.refinements[picks[j].weapon][picks[j].refine].name.replace(/ R\d$/, "")}`).join(", ");
     if (shortOf(teamKey2, members, combo)[i] === "cr") {
-      throw new Error(`${members[i].name} on ${teamKey2} (${built}) cannot reach their ${l.minCritRate}% Crit Rate: no weapon, echo and main stat on their list shows that much on the character screen`);
+      throw new UnavailableBuild(`${members[i].name} on ${teamKey2} (${built}) cannot reach their ${l.minCritRate}% Crit Rate: no weapon, echo and main stat on their list shows that much on the character screen`, picks);
     }
     const asked = l.minEr ? ` (their kit asks for ${l.minEr}% at least)` : "";
-    throw new Error(`${members[i].name} on ${teamKey2} (${built}) cannot fill their Energy bar${asked}: ${rolls} ER rolls wanted, ${l.substat.tiers[l.substat.tiers.length - 1].rolls} is all a spread carries, and no ER 3-cost main stat is on their list`);
+    throw new UnavailableBuild(`${members[i].name} on ${teamKey2} (${built}) cannot fill their Energy bar${asked}: ${rolls} ER rolls wanted, ${l.substat.tiers[l.substat.tiers.length - 1].rolls} is all a spread carries, and no ER 3-cost main stat is on their list`, picks);
   }
   return picks;
 }
@@ -32782,7 +32820,15 @@ function solveTeam(teamKey2, members, filters, known = null, onProgress) {
     bases = /* @__PURE__ */ new Map();
     cachedTeam = teamKey2;
   }
-  const picks = known ?? optimizeTeam(teamKey2, members, filters);
+  let picks;
+  try {
+    picks = known ?? optimizeTeam(teamKey2, members, filters);
+  } catch (err) {
+    if (filters.cost !== "makan" || !(err instanceof UnavailableBuild))
+      throw err;
+    onProgress?.(1);
+    return { picks: err.picks, rows: [], scores: [], unavailable: err.message };
+  }
   const { rows, hidden } = rowPicks(teamKey2, members, picks, filters, (s) => onProgress?.(s / 2));
   const score = (row) => {
     const combo = members.map((m, i) => comboOf(m.loadout, row[i]));
@@ -32854,6 +32900,9 @@ export {
   PRIMARY_TEAM,
   teamKey,
   teamAt,
+  DEFAULT_TEAM_COST,
+  MAKAN_COST_LABEL,
+  MAKAN_COST_OVERRIDES,
   loadoutName,
   member,
   AXES,

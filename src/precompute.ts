@@ -99,7 +99,7 @@ if (!isMainThread) {
           const f = filtersFor(state);
           solves.get(state)!.set(bestKey(key, members, f), solved);
           const pk = picksKey(key, members, f);
-          if (owner.get(pk) === state) picks.get(state)!.set(pk, solved.picks);
+          if (!solved.unavailable && owner.get(pk) === state) picks.get(state)!.set(pk, solved.picks);
           rows[state] = (rows[state] ?? 0) + solved.rows.length;
           if (++done % 100 === 0 || done === count) {
             process.stdout.write(`\r${done}/${count} solves  ${((Date.now() - started) / 1000).toFixed(0)}s   `);

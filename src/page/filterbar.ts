@@ -8,6 +8,7 @@ import type { Axis, TeamCost, ScopedCompare } from "../solver.js";
 import { TEAMS, RESONATOR_HUE, filters, resonatorFilters, OPTION_FILTER_MAPS, sequenceTagsOf, tagOwner, comparable, MATRIX_RESONATORS } from "./model.js";
 import type { ResonatorFilter, OptionKind } from "./model.js";
 import { esc, CLICK } from "./panels.js";
+import { MAKAN_COST_LABEL, MAKAN_COST_OVERRIDES } from "../costs.js";
 
 const app = document.getElementById("app")!;
 
@@ -164,6 +165,12 @@ function searchResults(): string {
 /* ---------------------------------------------------------------------------- filter aside */
 
 const COST_HELP = [
+  `${MAKAN_COST_LABEL} - Unlisted resonators are S0 on their configured standard or 4* weapon, including Rover, 4* and standard resonators. R0 means no signature; fixed weapon refinements are retained.`,
+  ...Object.entries(MAKAN_COST_OVERRIDES).map(([name, cost]) => cost.weapon
+    ? `${name}: S${cost.sequence}, ${cost.weapon} R${cost.refinement}.`
+    : `${name}: S${cost.sequence}R${cost.signature ? cost.refinement : 0}.`),
+  "Makan's costs overrides apply in every team and mode. Opening a comparison shows alternative builds; echoes and stats are optimized as usual.",
+  "Teams whose configured rotations require higher sequences or cannot meet energy or Crit Rate requirements are omitted from Makan's costs.",
   "s0r0 all - Limited resonators are S0 and use the best standard or 4* weapon available at R1. Rover and 4* resonators are S6.",
   "s0r1 mdps +r0 supports - Each team gets a single signature weapon at R1, on whichever of its main DPS gives the best DPR increase — never a support. Dual DPS teams still only get one signature weapon.",
   "s0r1 all - All limited resonators get their best signature weapon, while Rover and 4* supports may still use standard or 4* weapons.",
@@ -192,6 +199,7 @@ export function comparisonFilters(): string {
       + `<div class="tcopt-head">`
       + `<button type="button" class="tcopt-name" data-help="cost" aria-expanded="${open}">Team Cost<span class="arrow">›</span></button>`
       + `<select id="cost" class="tcselect" aria-label="Team Cost" title="Team Cost">`
+      + option("makan", MAKAN_COST_LABEL)
       + option("s0r0", "s0r0 all") + option("s0r1mdps", "s0r1 mdps +r0 supports") + option("s0r1", "s0r1 all")
       + option("s2r1mdps", "s2r1 mdps +r1 supports")
       + option("s3r1mdps", "s3r1 mdps +r1 supports") + option("s6r1mdps", "s6r1 mdps +r1 supports")

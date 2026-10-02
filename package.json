@@ -6,9 +6,10 @@
   "main": "src/index.js",
   "scripts": {
     "build": "tsc && npm run bundle",
+    "test": "node --test tests/*.test.mjs",
     "watch": "tsc --watch",
     "dev": "python dev.py",
-    "precompute": "\"%USERPROFILE%\\tools\\node-v24.21.0-win-x64\\node.exe\" dist/src/precompute.js",
+    "precompute": "node dist/src/precompute.js",
     "bundle": "node -e \"require('node:fs').rmSync('dist/bundle',{recursive:true,force:true})\" && esbuild dist/src/index.js dist/src/solver.js --bundle --splitting --format=esm --outdir=dist/bundle --outbase=dist/src"
   },
   "repository": {

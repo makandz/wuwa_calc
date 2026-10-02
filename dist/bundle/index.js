@@ -5,6 +5,7 @@ import {
   BASE_RESISTANCE,
   CAST_NAME,
   CONCERTO_UNIT,
+  DEFAULT_TEAM_COST,
   ENEMY_MAX_OFFTUNE,
   ENERGY_UNIT,
   ER_TOLERANCE,
@@ -12,6 +13,8 @@ import {
   LEVEL_90_DOT,
   LEVEL_90_TUNE,
   MAINSTAT_ROWS,
+  MAKAN_COST_LABEL,
+  MAKAN_COST_OVERRIDES,
   MV_UNIT,
   NODE_NAME,
   OWN_DEF,
@@ -64,7 +67,7 @@ import {
   teamAt,
   teamKey,
   weaponBase
-} from "./chunk-G2PHDKXA.js";
+} from "./chunk-3SK7D7UC.js";
 
 // dist/src/display.js
 var shown = (s, i) => s.shownAfter?.[i] ?? [s.energy, s.concerto, s.offtune, ...s.forte][i];
@@ -989,7 +992,11 @@ var picksCache = /* @__PURE__ */ new Map();
 var results = /* @__PURE__ */ new Map();
 function storeSolved(teamKey2, solved, f = filters) {
   bestPicks.set(bestKey(teamKey2, TEAMS[teamKey2], f), solved);
-  picksCache.set(picksKey(teamKey2, TEAMS[teamKey2], f), solved.picks);
+  const pk = picksKey(teamKey2, TEAMS[teamKey2], f);
+  if (solved.unavailable)
+    picksCache.delete(pk);
+  else
+    picksCache.set(pk, solved.picks);
   solvesDirty = true;
 }
 var visibleRows = [];
@@ -1215,6 +1222,9 @@ function solveFits(key, solved, f) {
   f ??= filtersOfKey(key, members);
   if (!picksFit(key, solved.picks) || !solved.rows.every((r) => picksFit(key, r)) || !(solved.hidden ?? []).every((r) => picksFit(key, r)))
     return false;
+  if (solved.unavailable !== void 0) {
+    return f.cost === "makan" && typeof solved.unavailable === "string" && solved.unavailable.length > 0 && solved.rows.length === 0 && solved.scores.length === 0 && !(solved.hidden?.length || solved.hiddenScores?.length);
+  }
   const names = /* @__PURE__ */ new Set([...members.map((m) => m.name), TUNE_BREAK_ENEMY.name]);
   const dps = members.filter((m) => m.mainDps).map((m) => m.name);
   if (!solved.scores.every((s) => s.bySlot.every(([n]) => names.has(n)) && dps.every((d) => s.bySlot.some(([n]) => n === d))))
@@ -1317,6 +1327,7 @@ var hashParams = () => new URLSearchParams(location.hash.replace(/^#/, ""));
 var COMPARE_PARAM = { weapons: "cw", echoes: "ce", mainstats: "cm", substats: "cb", sequences: "cq", refines: "cr" };
 var SCOPED_PARAM = "cs";
 var COST_CODE = {
+  makan: "makan",
   s0r0: "r0",
   s0r1mdps: "r1m",
   s0r1: "r1",
@@ -1345,7 +1356,7 @@ function applyHash() {
     }
   }
   const code = params.get("tc");
-  const cost = Object.keys(COST_CODE).find((c) => COST_CODE[c] === code) ?? "s0r1";
+  const cost = Object.keys(COST_CODE).find((c) => COST_CODE[c] === code) ?? DEFAULT_TEAM_COST;
   if (filters.cost !== cost) {
     filters.cost = cost;
     changed = true;
@@ -1431,8 +1442,7 @@ function syncHash(team = hashTeam(), push = false) {
   const named = (map, mode) => [...map].filter(([, m]) => m === mode).map(([name]) => encodeURIComponent(map === resonatorFilters ? name.replace(/ /g, "") : name)).join(",");
   const compact = (n) => encodeURIComponent(n.replace(/ /g, ""));
   const parts = filters.matrix.length ? [`mx=${filters.matrix.map(compact).join(",")}`] : [];
-  if (filters.cost !== "s0r1")
-    parts.push(`tc=${COST_CODE[filters.cost]}`);
+  parts.push(`tc=${COST_CODE[filters.cost]}`);
   for (const axis of AXES) {
     if (filters[axis].length)
       parts.push(`${COMPARE_PARAM[axis]}=${filters[axis].map((n) => encodeURIComponent(n.replace(/ /g, ""))).join(",")}`);
@@ -2473,6 +2483,10 @@ function searchResults() {
   }).join("");
 }
 var COST_HELP = [
+  `${MAKAN_COST_LABEL} - Unlisted resonators are S0 on their configured standard or 4* weapon, including Rover, 4* and standard resonators. R0 means no signature; fixed weapon refinements are retained.`,
+  ...Object.entries(MAKAN_COST_OVERRIDES).map(([name, cost]) => cost.weapon ? `${name}: S${cost.sequence}, ${cost.weapon} R${cost.refinement}.` : `${name}: S${cost.sequence}R${cost.signature ? cost.refinement : 0}.`),
+  "Makan's costs overrides apply in every team and mode. Opening a comparison shows alternative builds; echoes and stats are optimized as usual.",
+  "Teams whose configured rotations require higher sequences or cannot meet energy or Crit Rate requirements are omitted from Makan's costs.",
   "s0r0 all - Limited resonators are S0 and use the best standard or 4* weapon available at R1. Rover and 4* resonators are S6.",
   "s0r1 mdps +r0 supports - Each team gets a single signature weapon at R1, on whichever of its main DPS gives the best DPR increase \u2014 never a support. Dual DPS teams still only get one signature weapon.",
   "s0r1 all - All limited resonators get their best signature weapon, while Rover and 4* supports may still use standard or 4* weapons.",
@@ -2491,7 +2505,7 @@ function comparisonFilters() {
   const costBox = () => {
     const open = openHelp.has("cost");
     const option = (value, label) => `<option value="${value}"${filters.cost === value ? " selected" : ""}>${label}</option>`;
-    return `<div class="tcopt${open ? " open" : ""}"><div class="tcopt-head"><button type="button" class="tcopt-name" data-help="cost" aria-expanded="${open}">Team Cost<span class="arrow">\u203A</span></button><select id="cost" class="tcselect" aria-label="Team Cost" title="Team Cost">` + option("s0r0", "s0r0 all") + option("s0r1mdps", "s0r1 mdps +r0 supports") + option("s0r1", "s0r1 all") + option("s2r1mdps", "s2r1 mdps +r1 supports") + option("s3r1mdps", "s3r1 mdps +r1 supports") + option("s6r1mdps", "s6r1 mdps +r1 supports") + option("s6r5", "s6r5 all") + `</select></div><div class="tcopt-desc"${open ? "" : " hidden"}><ul>${COST_HELP.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div></div>`;
+    return `<div class="tcopt${open ? " open" : ""}"><div class="tcopt-head"><button type="button" class="tcopt-name" data-help="cost" aria-expanded="${open}">Team Cost<span class="arrow">\u203A</span></button><select id="cost" class="tcselect" aria-label="Team Cost" title="Team Cost">` + option("makan", MAKAN_COST_LABEL) + option("s0r0", "s0r0 all") + option("s0r1mdps", "s0r1 mdps +r0 supports") + option("s0r1", "s0r1 all") + option("s2r1mdps", "s2r1 mdps +r1 supports") + option("s3r1mdps", "s3r1 mdps +r1 supports") + option("s6r1mdps", "s6r1 mdps +r1 supports") + option("s6r5", "s6r5 all") + `</select></div><div class="tcopt-desc"${open ? "" : " hidden"}><ul>${COST_HELP.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div></div>`;
   };
   const note = (id, label, lines, extra = "") => {
     const open = openHelp.has(id);
@@ -5040,7 +5054,7 @@ function listen(w) {
       job.onShare(data.share);
       return;
     }
-    const solved = { picks: data.picks, rows: data.rows, scores: data.scores, hidden: data.hidden ?? [], hiddenScores: data.hiddenScores ?? [] };
+    const solved = { picks: data.picks, rows: data.rows, scores: data.scores, hidden: data.hidden ?? [], hiddenScores: data.hiddenScores ?? [], unavailable: data.unavailable };
     if (solveFits(bestKey(job.key, job.members, job.f), solved)) {
       settle2(w, job, solved);
       return;
