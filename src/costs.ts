@@ -1,3 +1,5 @@
+import { Tier } from "./engine/stats.js";
+
 export interface CharacterCost {
   sequence: number;
   signature: boolean;
@@ -5,6 +7,8 @@ export interface CharacterCost {
   weapon?: string;
 }
 
+// Bump when the personal preset changes so older solves cannot supply stale builds.
+export const MAKAN_COST_REVISION = 2;
 export const DEFAULT_TEAM_COST = "makan";
 export const MAKAN_COST_LABEL = "Makan's costs";
 export const MAKAN_DEFAULT_COST: Readonly<CharacterCost> = { sequence: 0, signature: false, refinement: 1 };
@@ -19,7 +23,11 @@ export const MAKAN_COST_OVERRIDES: Readonly<Record<string, Readonly<CharacterCos
   Cartethyia: { sequence: 0, signature: true, refinement: 1 },
   Ciaccona: { sequence: 0, signature: true, refinement: 1 },
   Shorekeeper: { sequence: 2, signature: false, refinement: 1 },
+  Verina: { sequence: 2, signature: false, refinement: 1 },
   Denia: { sequence: 0, signature: false, refinement: 1, weapon: "Stringmaster" },
 };
 
-export const makanCost = (name: string): Readonly<CharacterCost> => MAKAN_COST_OVERRIDES[name] ?? MAKAN_DEFAULT_COST;
+const FOUR_STAR_COST: Readonly<CharacterCost> = { ...MAKAN_DEFAULT_COST, sequence: 6 };
+/** Tier.Free also includes Rover, whose personal sequence setting remains S0. */
+export const makanCost = (name: string, tier = Tier.Limited): Readonly<CharacterCost> =>
+  MAKAN_COST_OVERRIDES[name] ?? (tier === Tier.Free && !name.endsWith(" Rover") ? FOUR_STAR_COST : MAKAN_DEFAULT_COST);

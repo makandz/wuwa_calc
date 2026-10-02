@@ -29,6 +29,8 @@ import type { ResonatorFilter, OptionKind, TeamRow } from "./model.js";
 import type { SearchKind, SearchHit } from "./filterbar.js";
 import { esc, deferredPop, rect, clearPops, subsLabel, CLICK } from "./panels.js";
 
+import { ownership, saveOwnershipPreference } from "../ownership.js";
+
 const app = document.getElementById("app")!;
 const topbar = document.getElementById("topbar")!;
 
@@ -862,6 +864,16 @@ document.addEventListener("click", (e) => {
   renderComparison();
 });
 document.addEventListener("change", (e) => {
+  const input = e.target as HTMLInputElement;
+  if (input.id === "onlyOwned") {
+    withRowCap(() => {
+      const was = ownership.onlyOwned;
+      ownership.onlyOwned = input.checked;
+      return () => { ownership.onlyOwned = was; input.checked = was; };
+    });
+    saveOwnershipPreference();
+    return;
+  }
   const select = e.target as HTMLSelectElement;
   if (select.id !== "cost") return;
   withRowCap(() => {

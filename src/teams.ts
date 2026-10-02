@@ -342,15 +342,18 @@ const SUPPORT_GROUP: string[] = ALL_TEAMS.map((team) => {
 /** The one team of each group that runs by default — the rest are never solved until the group is
  *  opened (page/model.ts's own `teamWanted()`). A team with no interchangeable support is its own
  *  group and always stands. */
-export const PRIMARY_TEAM: boolean[] = ALL_TEAMS.map(() => false);
-{
+export function primaryTeamsWhere(eligible: (team: TeamEntry) => boolean = () => true): boolean[] {
+  const primary = ALL_TEAMS.map(() => false);
   const best = new Map<string, { lead: number; index: number }>();
   ALL_TEAMS.forEach((team, i) => {
+    if (!eligible(team)) return;
     const held = best.get(SUPPORT_GROUP[i]!);
     if (!held || team.lead < held.lead) best.set(SUPPORT_GROUP[i]!, { lead: team.lead, index: i });
   });
-  for (const { index } of best.values()) PRIMARY_TEAM[index] = true;
+  for (const { index } of best.values()) primary[index] = true;
+  return primary;
 }
+export const PRIMARY_TEAM: boolean[] = primaryTeamsWhere();
 
 /** A team's key: its slot in `ALL_TEAMS`. No dash — a row key is this plus per-member combo keys. */
 export const teamKey = (index: number): string => `t${index}`;

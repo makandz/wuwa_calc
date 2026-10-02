@@ -2,10 +2,7 @@ node_modules/
 logs/
 __pycache__/
 
-# dist/ is the build. dist/bundle/ is the only part the page loads, and it is committed so
-# GitHub Pages can serve the site straight off the branch with no CI step (see README).
+# Vercel builds the browser bundle before deployment; generated code stays out of Git.
 dist/*
-!dist/bundle/
-# the precomputed solve cache the published table opens on (src/precompute.ts), committed for
-# the same reason
+# Precomputed calculations are versioned because npm run build does not regenerate them.
 !dist/solves/

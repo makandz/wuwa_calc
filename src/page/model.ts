@@ -14,6 +14,7 @@ import { runTeam, runFromScore } from "../teamrun.js";
 import type { TeamRun } from "../teamrun.js";
 import { teamKey, teamAt, ALL_TEAMS, PRIMARY_TEAM, INTERCHANGEABLE } from "../teams.js";
 import { DEFAULT_TEAM_COST } from "../costs.js";
+import { ownership, teamOwned, OWNED_PRIMARY_TEAMS } from "../ownership.js";
 
 /* ------------------------------------------------------------------------------------ teams */
 
@@ -245,13 +246,14 @@ function leaderNeeds(): Map<string, number> {
  * play together, still brings in every Sanhua team.
  */
 export function teamWanted(key: string, members: Member[]): boolean {
+  if (ownership.onlyOwned && !teamOwned(members)) return false;
   const has = (name: string): boolean => members.some((m) => m.name === name);
   // the bench behind one pairing: both teammates beside the interchangeable slot named, and every
   // support who can stand in it is solved. Short of that only the group's own team is, so the ones
   // it stands for cost nothing to leave out — except when the name added is an interchangeable
   // support themselves, which asks about them rather than about the pairing, and every group they
   // are the stood-down half of has to answer for them
-  if (!PRIMARY_TEAMS.has(key)
+  if (!(ownership.onlyOwned ? OWNED_PRIMARY_TEAMS : PRIMARY_TEAMS).has(key)
     && !members.some((m) => INTERCHANGEABLE.has(m.loadout) && resonatorFilters.get(m.name) === "include")
     && !members.every((m) => INTERCHANGEABLE.has(m.loadout) || resonatorFilters.get(m.name) === "include")) return false;
   for (const [name, mode] of resonatorFilters) if (mode === "exclude" && has(name)) return false;

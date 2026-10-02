@@ -10,7 +10,7 @@ import { runTeam, scoreOf, erRollsFor, shortOf, deriveRun } from "./teamrun.js";
 import type { TeamRun, RowScore } from "./teamrun.js";
 import { teamAt } from "./teams.js";
 import { critLineOf, Mainstat } from "./shared/mainstats.js";
-import { DEFAULT_TEAM_COST, makanCost } from "./costs.js";
+import { DEFAULT_TEAM_COST, MAKAN_COST_REVISION, makanCost } from "./costs.js";
 
 export interface Member {
   name: string;
@@ -111,8 +111,10 @@ export const axisOpen = (m: Member, filters: Filters, axis: Axis): boolean =>
 export const matrixOn = (m: Member, filters: Filters): boolean =>
   m.loadout.resonator.matrix != null && filters.matrix.includes(m.loadout.resonator.name);
 
+const costRevision = (cost: TeamCost): string => cost === "makan" ? `|v${MAKAN_COST_REVISION}` : "";
+
 export const filterSignature = (f: Filters): string =>
-  [[...f.matrix].sort().join("+"), f.cost, ...AXES.map((a) => [...f[a]].sort().join("+")), f.scoped.map(scopedKey).sort().join("+")].join(",");
+  [[...f.matrix].sort().join("+"), f.cost, ...AXES.map((a) => [...f[a]].sort().join("+")), f.scoped.map(scopedKey).sort().join("+")].join(",") + costRevision(f.cost);
 
 /** A solve's cache key: the team under everything that changes its row set — cost, and each
  *  member's Matrix bit, six axis bits and scoped compares. */
@@ -123,13 +125,13 @@ export const bestKey = (teamKey: string, members: Member[], filters: Filters): s
   };
   const one = (m: Member): string =>
     (matrixOn(m, filters) ? "m" : "") + AXES.map((a) => (axisOpen(m, filters, a) ? "1" : "0")).join("") + scoped(m);
-  return `${teamKey}|${filters.cost}|${members.map(one).join(",")}`;
+  return `${teamKey}|${filters.cost}|${members.map(one).join(",")}${costRevision(filters.cost)}`;
 };
 
 /** The best build's key: only what the *search* reads (weapons compared, each member's Matrix,
  *  cost) — every other axis changes which rows open, never which build wins. */
 export const picksKey = (teamKey: string, members: Member[], filters: Filters): string =>
-  `${teamKey}|${filters.cost}|${members.map((m) => (matrixOn(m, filters) ? "m" : "") + (axisOpen(m, filters, "weapons") ? "1" : "0")).join("")}`;
+  `${teamKey}|${filters.cost}|${members.map((m) => (matrixOn(m, filters) ? "m" : "") + (axisOpen(m, filters, "weapons") ? "1" : "0")).join("")}${costRevision(filters.cost)}`;
 
 /** Indices into a loadout's gear lists plus chain level, rank (into `Loadout.refinements[weapon]`),
  *  matrix and substat spread. Only weapon/echo/mainstat are ever searched. */
@@ -171,7 +173,7 @@ function costLevel(m: Member, cost: TeamCost, holds: boolean): number | null {
   const l = m.loadout;
   const max = l.sequences.length;
   if (cost === "makan") {
-    const at = makanCost(m.name).sequence;
+    const at = makanCost(m.name, l.resonator.tier).sequence;
     return at < l.minSequence || at > max ? null : at;
   }
   if (!max) return l.minSequence ? null : 0;

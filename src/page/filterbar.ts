@@ -10,6 +10,8 @@ import type { ResonatorFilter, OptionKind } from "./model.js";
 import { esc, CLICK } from "./panels.js";
 import { MAKAN_COST_LABEL, MAKAN_COST_OVERRIDES } from "../costs.js";
 
+import { ownership, ownsCharacter } from "../ownership.js";
+
 const app = document.getElementById("app")!;
 
 /* ---------------------------------------------------------------------------------- search */
@@ -51,6 +53,7 @@ function searchCandidates(): SearchHit[] {
   };
   for (const members of Object.values(TEAMS)) {
     for (const m of members) {
+      if (ownership.onlyOwned && !ownsCharacter(m.loadout.resonator)) continue;
       add("resonator", m.name);
       // the ranked names only while a rank is what the rows differ by — with refines closed every
       // row runs R1 and no cell reads "Emerald of Genesis R3" for the search to be filtering on
@@ -165,7 +168,7 @@ function searchResults(): string {
 /* ---------------------------------------------------------------------------- filter aside */
 
 const COST_HELP = [
-  `${MAKAN_COST_LABEL} - Unlisted resonators are S0 on their configured standard or 4* weapon, including Rover, 4* and standard resonators. R0 means no signature; fixed weapon refinements are retained.`,
+  `${MAKAN_COST_LABEL} - 4* resonators are S6; unlisted 5* resonators and Rover are S0. All use their configured standard or 4* weapon unless overridden. R0 means no signature; fixed weapon refinements are retained.`,
   ...Object.entries(MAKAN_COST_OVERRIDES).map(([name, cost]) => cost.weapon
     ? `${name}: S${cost.sequence}, ${cost.weapon} R${cost.refinement}.`
     : `${name}: S${cost.sequence}R${cost.signature ? cost.refinement : 0}.`),
@@ -222,6 +225,9 @@ export function comparisonFilters(): string {
     <div class="tcfilter-row note">
       ${note("readme", "README", README, `<li><button type="button" class="tutstart">How do I use this website? ${CLICK} here.</button></li>`)}
       ${costBox()}
+      <div class="tcopt"><label class="tcopt-role" title="Show teams where every character is owned.">
+        <input id="onlyOwned" type="checkbox"${ownership.onlyOwned ? " checked" : ""}>Only characters I own
+      </label></div>
       <div class="tcsearchrow">
         <div class="tcsearch">
           <input id="optionSearch" type="search" placeholder="Add resonator or comparison..."
