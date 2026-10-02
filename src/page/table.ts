@@ -28,6 +28,7 @@ import {
 import type { ResonatorFilter, OptionKind, TeamRow } from "./model.js";
 import type { SearchKind, SearchHit } from "./filterbar.js";
 import { esc, deferredPop, rect, clearPops, subsLabel, CLICK } from "./panels.js";
+import { portrait, loadPortraits } from "./portraits.js";
 
 import { ownership, saveOwnershipPreference } from "../ownership.js";
 
@@ -533,7 +534,7 @@ function comparisonTable(rows: TeamRow[]): string {
         + (seqTag ? ` data-sequence="${esc(seqTag)}" data-seq-gate="${combo.sequence}"` : "")
         + (refTag ? ` data-refine="${esc(refTag)}" data-ref-gate="${combo.weapon.refinement}"` : "")
         + ` style="--mem:${m.color};color:${m.color}">`
-        + `<span class="res-label">${esc(memberLabel(m, combo))}</span>`
+        + portrait(m.name) + `<span class="res-label">${esc(memberLabel(m, combo))}</span>`
         + `</div>`;
       const dpr = dprAt(i) ? `<div class="c num slotdpr" style="--mem:${m.color}">${fmt(personalFigure(run, m.name))}</div>` : "";
       const seqCmp = cmpAt("sequences", i) ? `<div class="c num slotcompare" style="--mem:${m.color}">${axisOpen(m, filters, "sequences") ? gearCompare(run, i, "sequences") : ""}</div>` : "";
@@ -617,7 +618,7 @@ function comparisonTable(rows: TeamRow[]): string {
   });
   // a zero-height ghost row (index.css `.tghost`) sizing every track to its final width
   const ghostPos = (i: number) =>
-    `<div class="c name res"><span class="res-label">${esc(wide.name[i]!)}</span></div>`
+    `<div class="c name res"><span class="character-portrait" aria-hidden="true"></span><span class="res-label">${esc(wide.name[i]!)}</span></div>`
     + (cmpAt("sequences", i) ? `<div class="c num slotcompare">${esc(wide.seqcmp[i]!)}</div>` : "")
     + (cmpAt("refines", i) ? `<div class="c num slotcompare">${esc(wide.refcmp[i]!)}</div>` : "")
     + GEAR_AXES.map((axis) => (openAt[axis][i]
@@ -710,6 +711,7 @@ export function drawWindow(force = false, scrollTop?: number): void {
     body += view.rowHtml(key, run, view.ranks[i]!);
   }
   grid.innerHTML = view.head + view.ghost() + spacer(0, from) + body + spacer(to, n);
+  loadPortraits(grid);
   drawnFrom = from; drawnTo = to;
 
   // measure the real pitch off the rows just drawn, and redo the spacers once if the guess was off
@@ -810,6 +812,7 @@ export function renderComparison(): void {
   clearPops();
   const scrollTop = app.querySelector(".tgrid") ? (app.querySelector("main")?.scrollTop ?? 0) : tableScrollTop;
   app.innerHTML = comparisonTable(visibleRows);
+  loadPortraits(app);
   app.className = "";
   measured = false;
   drawnFrom = drawnTo = -1;

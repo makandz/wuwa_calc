@@ -21,6 +21,7 @@ import { hitsOf } from "../teamrun.js";
 import type { TeamRun } from "../teamrun.js";
 import { results, FALLBACK_HUE } from "./model.js";
 import { ActionTag } from "../engine/rotation.js";
+import { portrait, loadPortraits } from "./portraits.js";
 
 export const esc = (s: unknown): string => String(s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -466,7 +467,7 @@ export function loadoutTable(run: TeamRun, needs?: Map<string, Map<string, strin
   const head = `<div class="rtrow rthead"><div class="c lbl">Resonator</div>`
     + builds.map((b) => {
       const hover = resonatorPopover(run, kitOf(b), equipped, b.member.name, slotHue);
-      return `<div class="c mem${hover ? " has" : ""}"${hover} style="--mem:${b.member.color}">${esc(b.member.name)}</div>`;
+      return `<div class="c mem${hover ? " has" : ""}"${hover} style="--mem:${b.member.color}"><span class="character-label">${portrait(b.member.name)}${esc(b.member.name)}</span></div>`;
     }).join("")
     + `</div>`;
   const row = (label: string, cells: string[]): string =>
@@ -583,7 +584,7 @@ export function dprTable(run: TeamRun, lines?: ChainGroup[][]): string {
 
   // a row's own label opens the same figure its Total column does, so a row can be read by its name
   const rowLabel = (slot: string, mem: string): string =>
-    `<div class="c name"${mem}${lines ? ` data-dist-row="${esc(slot)}"` : ""}>${esc(slot)}</div>`;
+    `<div class="c name"${mem}${lines ? ` data-dist-row="${esc(slot)}"` : ""}><span class="character-label">${portrait(slot)}${esc(slot)}</span></div>`;
 
   const dataRow = (slot: string, color: string): string => {
     const own = ownTotal(slot);
@@ -651,6 +652,7 @@ export function wireSourcePanels(root: HTMLElement): void {
 
   const place = (cell: Element, pop: HTMLElement): void => {
     if (pop.parentElement !== document.body) document.body.appendChild(pop);
+    loadPortraits(pop);
     pop.style.visibility = "hidden";
     pop.style.display = "block";
     const c = rect(cell);

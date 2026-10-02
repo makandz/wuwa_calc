@@ -15,6 +15,7 @@ import { ER_TOLERANCE } from "../shared/substats.js";
 import { results, detailFor, FALLBACK_HUE } from "./model.js";
 import { esc, lazyPop, rect, zoom, clearPops, panelRow, popover, infoPopover, buffsPopover, framesPopover, equippedGear, dprTable, loadoutTable, wireDistribution, drivePanel, dropPanel, holdPanels } from "./panels.js";
 import { rememberTableScroll } from "./table.js";
+import { loadPortraits } from "./portraits.js";
 
 const app = document.getElementById("app")!;
 const topbar = document.getElementById("topbar")!;
@@ -383,6 +384,7 @@ export function renderDetail(key: string): void {
   clearPops();
   const run = results.get(key)!;
   app.innerHTML = page(run);
+  loadPortraits(app);
   app.className = "";
   wireColumnDrag(app, detailFor(run).report.columns);
   wireCellSelect(app);
