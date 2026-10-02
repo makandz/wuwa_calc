@@ -16,14 +16,21 @@ Has to be served, not opened off disk — browsers block module imports on `file
 `127.0.0.1`, not `localhost`: the server binds IPv4 only, and on Windows `localhost` tries IPv6
 first and stalls ~200ms on *every* connection.
 
-The default Team Cost is **Makan's costs**. Unlisted characters use S0 and their configured
-standard or 4-star weapon, including standard characters, 4-stars and Rovers. R0 means no
+The default Team Cost is **Makan's costs**. Four-star characters use S6, Verina uses S2,
+and unlisted five-stars and Rovers use S0. Characters use their configured standard or
+4-star weapon unless overridden. R0 means no
 signature weapon; weapons configured at a fixed refinement retain that rank. The
 per-character exceptions live in `src/costs.ts`; Denia uses Stringmaster R1 in both modes.
 Opening a comparison still shows alternative sequences or weapons. Shared links explicitly
 include the selected cost preset, and the original presets remain available.
 Rotations that require higher sequences or cannot meet energy or Crit Rate requirements are
 omitted from this preset. This includes Jianxin's S2 rotation and Roccia's S6-only variant.
+
+The main screen's **Only characters I own** checkbox limits teams and character search to
+Makan's roster. The preference is saved locally and applies with any Team Cost preset.
+Edit the limited-character list in `src/ownership.ts`; standard characters, four-stars and
+Rovers are included automatically. Existing character filters still apply, and an owned
+support takes the place of an unowned default support within each interchangeable group.
 
 | path | role |
 | --- | --- |
@@ -37,6 +44,7 @@ omitted from this preset. This includes Jianxin's S2 rotation and Roccia's S6-on
 | `src/engine/rotation.ts` | `Rotation` and the scheduler that decides whose turn it is |
 | `src/teams.ts` | the `LOADOUTS` registry and every team the comparison table runs (`ALL_TEAMS`) |
 | `src/solver.ts` | the filter/pick vocabulary and the build search; also the Worker entry point |
+| `src/ownership.ts` | Makan's roster and the saved ownership checkbox preference |
 | `src/costs.ts` | the default preset and Makan's per-character sequence, weapon and refinement overrides |
 | `src/teamrun.ts` | the DOM-free engine run the search scores (`runTeam`) and the lines/totals read off it |
 | `src/display.ts` | turns a run into the report/hover-trace data the page renders |

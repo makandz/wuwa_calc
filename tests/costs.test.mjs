@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ALL_TEAMS, teamKey } from "../dist/src/teams.js";
-import { DEFAULT_TEAM_COST, MAKAN_COST_OVERRIDES } from "../dist/src/costs.js";
+import { DEFAULT_TEAM_COST, MAKAN_COST_OVERRIDES, makanCost } from "../dist/src/costs.js";
 import {
   TEAM_COSTS, defaultFilters, member, hasBuild, eligibleWeapons, sequenceLevels,
   solveTeam, comboOf, weaponBase, isSignature, bestKey, picksKey, filterSignature,
 } from "../dist/src/solver.js";
-import { applyHash, syncHash, filters, solveFits, storeSolved, picksCache } from "../dist/src/page/model.js";
+import { applyHash, syncHash, filters, solveFits, storeSolved, picksCache, bestPicks } from "../dist/src/page/model.js";
 
 const loadouts = [...new Set(ALL_TEAMS.flatMap((t) => t.loadouts))];
 const membersNamed = (name) => loadouts.filter((l) => l.resonator.name === name).map((l) => member(l));
@@ -35,8 +35,8 @@ test("the custom default resolves every named override in all its loadout varian
   }
 });
 
-test("unlisted free, standard and limited characters use S0 without a limited weapon", () => {
-  for (const name of ["Sanhua", "Verina", "Changli", "Encore"]) {
+test("unlisted Rovers, standard and limited characters use S0 without a limited weapon", () => {
+  for (const name of ["Aero Rover", "Changli", "Encore"]) {
     const m = membersNamed(name)[0];
     assert.ok(m);
     assert.deepEqual(sequenceLevels(m, defaultFilters()), [0]);
@@ -46,6 +46,24 @@ test("unlisted free, standard and limited characters use S0 without a limited we
   const builtIn = { ...defaultFilters(), cost: "s0r0" };
   assert.deepEqual(sequenceLevels(membersNamed("Sanhua")[0], builtIn), [6]);
   assert.deepEqual(sequenceLevels(membersNamed("Jianxin")[0], builtIn), [2]);
+});
+
+test("Makan's costs runs Verina at S2 and every configured four-star at S6", () => {
+  for (const [name, level] of [["Verina", 2], ["Sanhua", 6], ["Buling", 6], ["Danjin", 6], ["Mortefi", 6]]) {
+    for (const m of membersNamed(name)) {
+      assert.ok(hasBuild(m, defaultFilters()), `${name} has a valid build`);
+      assert.deepEqual(sequenceLevels(m, defaultFilters()), [level]);
+      assert.equal(isSignature(m.loadout, eligibleWeapons(m, defaultFilters())[0]), false);
+    }
+  }
+});
+
+test("personal preset cache keys cannot reuse solves from its earlier S0 defaults", () => {
+  const f = defaultFilters();
+  const ms = membersNamed("Verina");
+  assert.notEqual(bestKey("t0", ms, f), "t0|makan|000000");
+  assert.notEqual(picksKey("t0", ms, f), "t0|makan|0");
+  assert.notEqual(filterSignature(f), ",makan,,,,,,,");
 });
 
 test("S0 omits loadouts whose declared rotations require higher sequences", () => {
@@ -59,22 +77,44 @@ test("S0 omits loadouts whose declared rotations require higher sequences", () =
   }
 });
 
-test("an energy-infeasible custom team is cached as unavailable without caching invalid picks", () => {
+test("S6 Buling makes the Brant/Carlotta team energy-feasible", () => {
+  const index = ALL_TEAMS.findIndex((t) => t.loadouts.map((l) => l.resonator.name).join(",") === "Buling,Brant,Carlotta");
+  assert.ok(index >= 0);
+  const team = ALL_TEAMS[index];
+  const ms = team.loadouts.map((l, i) => member(l, team.mdps[i]));
+  const f = defaultFilters();
+  const solved = solveTeam(teamKey(index), ms, f);
+  assert.equal(solved.unavailable, undefined);
+  assert.ok(solved.rows.length > 0);
+  assert.equal(solved.picks[0].sequence, 6);
+  assert.ok(solved.scores.every((score) => Number.isFinite(score.total) && score.total > 0));
+  assert.equal(solveFits(bestKey(teamKey(index), ms, f), solved, f), true);
+});
+
+test("an energy-infeasible S0 Buling preset is cached as unavailable without invalid picks", () => {
   const index = ALL_TEAMS.findIndex((t) => t.loadouts.map((l) => l.resonator.name).join(",") === "Buling,Brant,Carlotta");
   assert.ok(index >= 0);
   const team = ALL_TEAMS[index];
   const ms = team.loadouts.map((l, i) => member(l, team.mdps[i]));
   const key = teamKey(index);
   const f = defaultFilters();
-  const solved = solveTeam(key, ms, f);
-  assert.match(solved.unavailable, /Carlotta.*cannot fill their Energy bar/);
-  assert.deepEqual(solved.rows, []);
-  assert.deepEqual(solved.scores, []);
-  assert.equal(solveFits(bestKey(key, ms, f), solved, f), true);
-  const restored = JSON.parse(JSON.stringify(solved));
-  assert.equal(solveFits(bestKey(key, ms, f), restored, f), true);
-  storeSolved(key, solved, f);
-  assert.equal(picksCache.has(picksKey(key, ms, f)), false);
+  const previous = MAKAN_COST_OVERRIDES.Buling;
+  try {
+    MAKAN_COST_OVERRIDES.Buling = { sequence: 0, signature: false, refinement: 1 };
+    const solved = solveTeam(key, ms, f);
+    assert.match(solved.unavailable, /Carlotta.*cannot fill their Energy bar/);
+    assert.deepEqual(solved.rows, []);
+    assert.deepEqual(solved.scores, []);
+    assert.equal(solveFits(bestKey(key, ms, f), solved, f), true);
+    const restored = JSON.parse(JSON.stringify(solved));
+    assert.equal(solveFits(bestKey(key, ms, f), restored, f), true);
+    storeSolved(key, solved, f);
+    assert.equal(picksCache.has(picksKey(key, ms, f)), false);
+  } finally {
+    if (previous) MAKAN_COST_OVERRIDES.Buling = previous;
+    else delete MAKAN_COST_OVERRIDES.Buling;
+    bestPicks.delete(bestKey(key, ms, f));
+  }
 });
 
 test("comparison axes expose alternatives without altering the other preset constraints", () => {
@@ -138,8 +178,8 @@ for (const name of ["Denia", "Lucy", "Phrolova"]) {
     assert.ok(solved.scores.every((score) => Number.isFinite(score.total) && score.total > 0));
     for (const picks of [solved.picks, ...solved.rows]) {
       ms.forEach((m, i) => {
-        const cost = MAKAN_COST_OVERRIDES[m.name];
-        assert.equal(picks[i].sequence, cost?.sequence ?? 0);
+        const cost = makanCost(m.name, m.loadout.resonator.tier);
+        assert.equal(picks[i].sequence, cost.sequence);
         const combo = comboOf(m.loadout, picks[i]);
         assert.equal(combo.weapon.refinement, 1);
         if (cost?.weapon) {

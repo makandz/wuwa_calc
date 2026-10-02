@@ -52,6 +52,7 @@ import {
   menuStats,
   mvPercent,
   picksKey,
+  primaryTeamsWhere,
   refineLevels,
   runFromScore,
   runTeam,
@@ -67,7 +68,7 @@ import {
   teamAt,
   teamKey,
   weaponBase
-} from "./chunk-3SK7D7UC.js";
+} from "./chunk-GOO5RACT.js";
 
 // dist/src/display.js
 var shown = (s, i) => s.shownAfter?.[i] ?? [s.energy, s.concerto, s.offtune, ...s.forte][i];
@@ -903,6 +904,52 @@ function buildReport(lines) {
   };
 }
 
+// dist/src/ownership.js
+var OWNED_LIMITED_CHARACTERS = /* @__PURE__ */ new Set([
+  "Phrolova",
+  "Cantarella",
+  "Qiuyuan",
+  "Hsin",
+  "Suisui",
+  "Lucy",
+  "Rebecca",
+  "Denia",
+  "Hiyuki",
+  "Sigrika",
+  "Aemeath",
+  "Mornye",
+  "Lynae",
+  "Chisa",
+  "Iuno",
+  "Augusta",
+  "Cartethyia",
+  "Ciaccona",
+  "Phoebe",
+  "Carlotta",
+  "Shorekeeper",
+  "Jinhsi",
+  "Yinlin",
+  "Jiyan"
+]);
+var ownsCharacter = (r) => r.tier !== 0 || OWNED_LIMITED_CHARACTERS.has(r.name);
+var teamOwned = (members) => members.every((m) => ownsCharacter(m.loadout.resonator));
+var OWNED_PRIMARY_TEAMS = new Set(primaryTeamsWhere((team) => team.loadouts.every((l) => ownsCharacter(l.resonator))).flatMap((primary, i) => primary ? [teamKey(i)] : []));
+var STORAGE_KEY = "wuwa.onlyOwned.v1";
+function savedPreference() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+var ownership = { onlyOwned: savedPreference() };
+function saveOwnershipPreference() {
+  try {
+    localStorage.setItem(STORAGE_KEY, ownership.onlyOwned ? "1" : "0");
+  } catch {
+  }
+}
+
 // dist/src/page/model.js
 var TEAMS = Object.fromEntries(ALL_TEAMS.map(({ loadouts, mdps }, i) => [
   teamKey(i),
@@ -1047,8 +1094,10 @@ function leaderNeeds() {
   return poolNeeds;
 }
 function teamWanted(key, members) {
+  if (ownership.onlyOwned && !teamOwned(members))
+    return false;
   const has = (name) => members.some((m) => m.name === name);
-  if (!PRIMARY_TEAMS.has(key) && !members.some((m) => INTERCHANGEABLE.has(m.loadout) && resonatorFilters.get(m.name) === "include") && !members.every((m) => INTERCHANGEABLE.has(m.loadout) || resonatorFilters.get(m.name) === "include"))
+  if (!(ownership.onlyOwned ? OWNED_PRIMARY_TEAMS : PRIMARY_TEAMS).has(key) && !members.some((m) => INTERCHANGEABLE.has(m.loadout) && resonatorFilters.get(m.name) === "include") && !members.every((m) => INTERCHANGEABLE.has(m.loadout) || resonatorFilters.get(m.name) === "include"))
     return false;
   for (const [name, mode] of resonatorFilters)
     if (mode === "exclude" && has(name))
@@ -2392,6 +2441,8 @@ function searchCandidates() {
   };
   for (const members of Object.values(TEAMS)) {
     for (const m of members) {
+      if (ownership.onlyOwned && !ownsCharacter(m.loadout.resonator))
+        continue;
       add("resonator", m.name);
       if (axisOpen(m, filters, "weapons")) {
         for (const i of eligibleWeapons(m, filters)) {
@@ -2483,7 +2534,7 @@ function searchResults() {
   }).join("");
 }
 var COST_HELP = [
-  `${MAKAN_COST_LABEL} - Unlisted resonators are S0 on their configured standard or 4* weapon, including Rover, 4* and standard resonators. R0 means no signature; fixed weapon refinements are retained.`,
+  `${MAKAN_COST_LABEL} - 4* resonators are S6; unlisted 5* resonators and Rover are S0. All use their configured standard or 4* weapon unless overridden. R0 means no signature; fixed weapon refinements are retained.`,
   ...Object.entries(MAKAN_COST_OVERRIDES).map(([name, cost]) => cost.weapon ? `${name}: S${cost.sequence}, ${cost.weapon} R${cost.refinement}.` : `${name}: S${cost.sequence}R${cost.signature ? cost.refinement : 0}.`),
   "Makan's costs overrides apply in every team and mode. Opening a comparison shows alternative builds; echoes and stats are optimized as usual.",
   "Teams whose configured rotations require higher sequences or cannot meet energy or Crit Rate requirements are omitted from Makan's costs.",
@@ -2515,6 +2566,9 @@ function comparisonFilters() {
     <div class="tcfilter-row note">
       ${note("readme", "README", README, `<li><button type="button" class="tutstart">How do I use this website? ${CLICK} here.</button></li>`)}
       ${costBox()}
+      <div class="tcopt"><label class="tcopt-role" title="Show teams where every character is owned.">
+        <input id="onlyOwned" type="checkbox"${ownership.onlyOwned ? " checked" : ""}>Only characters I own
+      </label></div>
       <div class="tcsearchrow">
         <div class="tcsearch">
           <input id="optionSearch" type="search" placeholder="Add resonator or comparison..."
@@ -3275,6 +3329,19 @@ document.addEventListener("click", (e) => {
   renderComparison();
 });
 document.addEventListener("change", (e) => {
+  const input = e.target;
+  if (input.id === "onlyOwned") {
+    withRowCap(() => {
+      const was = ownership.onlyOwned;
+      ownership.onlyOwned = input.checked;
+      return () => {
+        ownership.onlyOwned = was;
+        input.checked = was;
+      };
+    });
+    saveOwnershipPreference();
+    return;
+  }
   const select = e.target;
   if (select.id !== "cost")
     return;

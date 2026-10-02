@@ -32285,21 +32285,26 @@ var SUPPORT_GROUP = ALL_TEAMS.map((team) => {
     key = FOLDED.get(key);
   return key;
 });
-var PRIMARY_TEAM = ALL_TEAMS.map(() => false);
-{
+function primaryTeamsWhere(eligible = () => true) {
+  const primary = ALL_TEAMS.map(() => false);
   const best = /* @__PURE__ */ new Map();
   ALL_TEAMS.forEach((team, i) => {
+    if (!eligible(team))
+      return;
     const held = best.get(SUPPORT_GROUP[i]);
     if (!held || team.lead < held.lead)
       best.set(SUPPORT_GROUP[i], { lead: team.lead, index: i });
   });
   for (const { index } of best.values())
-    PRIMARY_TEAM[index] = true;
+    primary[index] = true;
+  return primary;
 }
+var PRIMARY_TEAM = primaryTeamsWhere();
 var teamKey = (index) => `t${index}`;
 var teamAt = (key) => /^t\d+$/.test(key) ? ALL_TEAMS[Number(key.slice(1))] : void 0;
 
 // dist/src/costs.js
+var MAKAN_COST_REVISION = 2;
 var DEFAULT_TEAM_COST = "makan";
 var MAKAN_COST_LABEL = "Makan's costs";
 var MAKAN_DEFAULT_COST = { sequence: 0, signature: false, refinement: 1 };
@@ -32313,9 +32318,11 @@ var MAKAN_COST_OVERRIDES = {
   Cartethyia: { sequence: 0, signature: true, refinement: 1 },
   Ciaccona: { sequence: 0, signature: true, refinement: 1 },
   Shorekeeper: { sequence: 2, signature: false, refinement: 1 },
+  Verina: { sequence: 2, signature: false, refinement: 1 },
   Denia: { sequence: 0, signature: false, refinement: 1, weapon: "Stringmaster" }
 };
-var makanCost = (name) => MAKAN_COST_OVERRIDES[name] ?? MAKAN_DEFAULT_COST;
+var FOUR_STAR_COST = { ...MAKAN_DEFAULT_COST, sequence: 6 };
+var makanCost = (name, tier = 0) => MAKAN_COST_OVERRIDES[name] ?? (tier === 2 && !name.endsWith(" Rover") ? FOUR_STAR_COST : MAKAN_DEFAULT_COST);
 
 // dist/src/solver.js
 var loadoutName = (l) => l.mode ? `${l.resonator.name} (${l.mode.name.split(" ").pop()})` : l.resonator.name;
@@ -32361,16 +32368,17 @@ var defaultFilters = () => ({
 });
 var axisOpen = (m, filters, axis) => filters[axis].includes(m.loadout.resonator.name);
 var matrixOn = (m, filters) => m.loadout.resonator.matrix != null && filters.matrix.includes(m.loadout.resonator.name);
-var filterSignature = (f) => [[...f.matrix].sort().join("+"), f.cost, ...AXES.map((a) => [...f[a]].sort().join("+")), f.scoped.map(scopedKey).sort().join("+")].join(",");
+var costRevision = (cost) => cost === "makan" ? `|v${MAKAN_COST_REVISION}` : "";
+var filterSignature = (f) => [[...f.matrix].sort().join("+"), f.cost, ...AXES.map((a) => [...f[a]].sort().join("+")), f.scoped.map(scopedKey).sort().join("+")].join(",") + costRevision(f.cost);
 var bestKey = (teamKey2, members, filters) => {
   const scoped = (m) => {
     const own = filters.scoped.filter((s) => s.resonator === m.loadout.resonator.name).map((s) => `${s.on}~${s.value}~${s.axis}`).sort();
     return own.length ? `:${own.join(";")}` : "";
   };
   const one = (m) => (matrixOn(m, filters) ? "m" : "") + AXES.map((a) => axisOpen(m, filters, a) ? "1" : "0").join("") + scoped(m);
-  return `${teamKey2}|${filters.cost}|${members.map(one).join(",")}`;
+  return `${teamKey2}|${filters.cost}|${members.map(one).join(",")}${costRevision(filters.cost)}`;
 };
-var picksKey = (teamKey2, members, filters) => `${teamKey2}|${filters.cost}|${members.map((m) => (matrixOn(m, filters) ? "m" : "") + (axisOpen(m, filters, "weapons") ? "1" : "0")).join("")}`;
+var picksKey = (teamKey2, members, filters) => `${teamKey2}|${filters.cost}|${members.map((m) => (matrixOn(m, filters) ? "m" : "") + (axisOpen(m, filters, "weapons") ? "1" : "0")).join("")}${costRevision(filters.cost)}`;
 var UnavailableBuild = class extends Error {
   picks;
   constructor(message, picks) {
@@ -32400,7 +32408,7 @@ function costLevel(m, cost, holds) {
   const l = m.loadout;
   const max = l.sequences.length;
   if (cost === "makan") {
-    const at2 = makanCost(m.name).sequence;
+    const at2 = makanCost(m.name, l.resonator.tier).sequence;
     return at2 < l.minSequence || at2 > max ? null : at2;
   }
   if (!max)
@@ -32897,6 +32905,7 @@ export {
   mainstatSlotBuffs,
   INTERCHANGEABLE,
   ALL_TEAMS,
+  primaryTeamsWhere,
   PRIMARY_TEAM,
   teamKey,
   teamAt,
