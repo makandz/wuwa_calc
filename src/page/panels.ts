@@ -511,15 +511,12 @@ export function loadoutTable(run: TeamRun, needs?: Map<string, Map<string, strin
     return spreadCell(piece, b.member.name, declaredRows(rolls, b.member.name, true, lit),
       `Substats (${rolls.length} lines)`, true);
   })));
-  // S0 is the absence of a chain, not a pick — the row only appears once somebody holds a node
-  if (builds.some((b) => b.combo.sequence > 0)) {
-    rows.push(row("Sequences", builds.map((b) => {
-      if (!b.combo.sequence) return `<div class="c"></div>`;
-      const held = b.member.loadout.sequences.slice(0, b.combo.sequence);
-      const hover = piecePopover(run, held, b.member.name, slotHue);
-      return `<div class="c${hover ? " has" : ""}"${hover}>${held.map((_, i) => `S${i + 1}`).join(", ")}</div>`;
-    })));
-  }
+  rows.push(row("Sequences", builds.map((b) => {
+    if (!b.combo.sequence) return `<div class="c">S0</div>`;
+    const held = b.member.loadout.sequences.slice(0, b.combo.sequence);
+    const hover = piecePopover(run, held, b.member.name, slotHue);
+    return `<div class="c${hover ? " has" : ""}"${hover}>${held.map((_, i) => `S${i + 1}`).join(", ")}</div>`;
+  })));
 
   if (builds.some((b) => b.member.loadout.mode)) {
     rows.push(row("Mode", builds.map((b) => gearCell(b.member.name, b.member.loadout.mode ?? null))));

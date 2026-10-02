@@ -21,11 +21,12 @@ Has to be served, not opened off disk — browsers block module imports on `file
 `127.0.0.1`, not `localhost`: the server binds IPv4 only, and on Windows `localhost` tries IPv6
 first and stalls ~200ms on *every* connection.
 
-The default Team Cost is **Makan's costs**. Four-star characters use S6, Verina uses S2,
-and unlisted five-stars and Rovers use S0. Characters use their configured standard or
+The default Team Cost is **Makan's costs**. Four-star characters and all Rover elements use S6, Verina uses S2,
+and unlisted five-stars use S0. Characters use their configured standard or
 4-star weapon unless overridden. R0 means no
 signature weapon; weapons configured at a fixed refinement retain that rank. The
 per-character exceptions live in `src/costs.ts`; Denia uses Stringmaster R1 in both modes.
+The main table always labels the sequence level, including S0; the loadout Sequences row also shows S0 explicitly.
 Opening a comparison still shows alternative sequences or weapons. Shared links explicitly
 include the selected cost preset, and the original presets remain available.
 Rotations that require higher sequences or cannot meet energy or Crit Rate requirements are
