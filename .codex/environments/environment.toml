@@ -1,0 +1,5 @@
+version = 1
+name = "wuwa_calc"
+
+[setup]
+script = "npm ci && npm run build"
