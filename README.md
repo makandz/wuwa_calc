@@ -1,8 +1,8 @@
 # wuwa_calc
 
-A Wuthering Waves damage calculator. Pure TypeScript, no framework, no bundler — `tsc` compiles
+A Wuthering Waves damage calculator. Pure TypeScript with no framework. `tsc` compiles
 everything under `src/` into `dist/`, mirrored one level deeper (`src/engine/gear.ts` →
-`dist/src/engine/gear.js`).
+`dist/src/engine/gear.js`), and esbuild bundles the browser entry points.
 
 ```
 python dev.py                  # compilers + server; then http://127.0.0.1:8731/index.html
@@ -12,12 +12,18 @@ npx tsc --noEmit               # just typecheck
 npm test                      # cost preset regression checks, after npm run build
 ```
 
+Vercel runs `npm run build` before deployment, so `dist/bundle/` is generated and ignored
+by Git. `dist/solves/` stays versioned because the build does not regenerate the precomputed
+calculations. Refresh those with `npm run build && npm run precompute` when calculation
+inputs change.
+
 Has to be served, not opened off disk — browsers block module imports on `file://` URLs. Use
 `127.0.0.1`, not `localhost`: the server binds IPv4 only, and on Windows `localhost` tries IPv6
 first and stalls ~200ms on *every* connection.
 
-The default Team Cost is **Makan's costs**. Unlisted characters use S0 and their configured
-standard or 4-star weapon, including standard characters, 4-stars and Rovers. R0 means no
+The default Team Cost is **Makan's costs**. Four-star characters use S6, Verina uses S2,
+and unlisted five-stars and Rovers use S0. Characters use their configured standard or
+4-star weapon unless overridden. R0 means no
 signature weapon; weapons configured at a fixed refinement retain that rank. The
 per-character exceptions live in `src/costs.ts`; Denia uses Stringmaster R1 in both modes.
 Opening a comparison still shows alternative sequences or weapons. Shared links explicitly
@@ -33,6 +39,12 @@ cache first on subsequent visits, without a network request or expiry. If storag
 images still load using the HTTP cache. Browsers can evict saved images or users can clear site
 data; the next visit downloads them again. Include `assets/` when publishing the site.
 
+The main screen's **Only characters I own** checkbox limits teams and character search to
+Makan's roster. The preference is saved locally and applies with any Team Cost preset.
+Edit the limited-character list in `src/ownership.ts`; standard characters, four-stars and
+Rovers are included automatically. Existing character filters still apply, and an owned
+support takes the place of an unowned default support within each interchangeable group.
+
 | path | role |
 | --- | --- |
 | `src/engine/gear.ts` | every equippable thing and the containers naming a build: the `Gear` tree, `EchoLoadout`, `Loadout` |
@@ -45,6 +57,7 @@ data; the next visit downloads them again. Include `assets/` when publishing the
 | `src/engine/rotation.ts` | `Rotation` and the scheduler that decides whose turn it is |
 | `src/teams.ts` | the `LOADOUTS` registry and every team the comparison table runs (`ALL_TEAMS`) |
 | `src/solver.ts` | the filter/pick vocabulary and the build search; also the Worker entry point |
+| `src/ownership.ts` | Makan's roster and the saved ownership checkbox preference |
 | `src/costs.ts` | the default preset and Makan's per-character sequence, weapon and refinement overrides |
 | `src/teamrun.ts` | the DOM-free engine run the search scores (`runTeam`) and the lines/totals read off it |
 | `src/display.ts` | turns a run into the report/hover-trace data the page renders |
